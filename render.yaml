@@ -1,5 +1,5 @@
 services:
-  # ─── Backend Service (100% Free Plan) ──────────────────────────────
+  # ─── Backend Service (Free Web Service) ───────────────────────────
   - type: web
     name: vouta-backend
     env: node
@@ -23,11 +23,10 @@ services:
       - key: CORS_ORIGIN
         value: https://vouta-frontend.onrender.com,http://localhost:3000
 
-  # ─── Frontend Static Site (100% Free Plan) ─────────────────────────
+  # ─── Frontend Static Site (Always Free) ──────────────────────────
   - type: web
     name: vouta-frontend
     env: static
-    plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
