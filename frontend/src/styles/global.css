@@ -1,7 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --font-main: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Bebas Neue', 'Segoe UI', Impact, sans-serif;
+  --font-main: 'DM Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   --paper: #F8FAFC;
@@ -11,7 +12,6 @@
   --ink: #0F172A;
   --ink-soft: #64748B;
   
-  /* Rich Accent Colors */
   --purple: #8B5CF6;
   --purple-dark: #7C3AED;
   --purple-light: #F3E8FF;
@@ -30,6 +30,9 @@
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+
+  --sidebar-width: 250px;
+  --sidebar-collapsed: 68px;
 }
 
 * {
@@ -102,12 +105,14 @@ body {
 }
 
 .bc-auth-logo {
-  font-weight: 800;
-  font-size: 28px;
+  font-family: var(--font-display) !important;
+  font-weight: 400;
+  font-size: 36px;
   margin: 0 0 6px;
   color: var(--purple-dark);
   text-align: center;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .bc-auth-sub {
@@ -152,35 +157,88 @@ body {
   opacity: 0.8;
 }
 
-/* ─── Animated Sidebar ───────────────────────────────────────────── */
+/* Collapsible Sidebar */
 .bc-sidebar {
-  width: 250px;
+  width: var(--sidebar-width);
   flex-shrink: 0;
   background: #FFFFFF;
   border-right: 1px solid #E2E8F0;
   color: #64748B;
-  padding: 28px 16px;
+  padding: 20px 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   box-shadow: 4px 0 20px rgba(15, 23, 42, 0.02);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  position: relative;
+}
+
+.bc-sidebar.collapsed {
+  width: var(--sidebar-collapsed);
+  padding: 20px 8px;
+}
+
+.bc-sidebar-toggle {
+  position: absolute;
+  top: 16px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-soft);
+  transition: all 0.2s ease;
+  z-index: 5;
+}
+.bc-sidebar.collapsed .bc-sidebar-toggle {
+  right: 50%;
+  transform: translateX(50%);
+}
+.bc-sidebar-toggle:hover {
+  background: var(--purple-light);
+  color: var(--purple-dark);
+  border-color: var(--purple);
 }
 
 .bc-logo {
-  font-weight: 800;
-  font-size: 26px;
+  font-family: var(--font-display) !important;
+  font-weight: 400;
+  font-size: 28px;
   color: var(--purple-dark);
-  letter-spacing: -0.02em;
-  margin: 0 8px 2px;
+  letter-spacing: 0.06em;
+  margin: 0 4px 2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+.bc-sidebar.collapsed .bc-logo {
+  font-size: 18px;
+  margin: 0;
+  text-align: center;
+  letter-spacing: 0;
 }
 
 .bc-logo-sub {
   font-size: 10px;
   color: var(--blue);
-  margin: 0 8px 26px;
+  margin: 0 4px 22px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 700;
+  white-space: nowrap;
+  transition: opacity 0.2s ease;
+}
+.bc-sidebar.collapsed .bc-logo-sub {
+  opacity: 0;
+  height: 0;
+  margin: 0;
+  overflow: hidden;
 }
 
 /* Animated Navigation Items */
@@ -191,7 +249,7 @@ body {
   gap: 12px;
   padding: 11px 14px;
   border-radius: var(--radius-md);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   border: none;
@@ -200,12 +258,22 @@ body {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
   overflow: hidden;
+  white-space: nowrap;
+}
+
+.bc-sidebar.collapsed .bc-nav-item {
+  justify-content: center;
+  padding: 11px 0;
+}
+.bc-sidebar.collapsed .bc-nav-item .bc-nav-label {
+  display: none;
 }
 
 .bc-nav-item .bc-nav-icon {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
   color: #94A3B8;
 }
@@ -294,14 +362,84 @@ body {
   color: var(--green-dark);
 }
 
+/* Top Header Bar */
+.bc-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 32px 0;
+  gap: 14px;
+}
+
+.bc-user-widget {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  cursor: default;
+  user-select: none;
+}
+
+.bc-user-widget-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--purple-dark), var(--blue));
+  color: #FFFFFF;
+  font-family: var(--font-display) !important;
+  font-weight: 400;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.bc-user-widget-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.bc-user-widget-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.bc-user-widget-company {
+  font-size: 11px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
 /* Main Content */
 .bc-main {
   flex: 1;
   min-width: 0;
   background: #F8FAFC;
-  padding: 36px 44px 52px;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   max-height: 100vh;
+}
+
+.bc-main-content {
+  padding: 24px 44px 52px;
+  flex: 1;
 }
 
 .bc-topbar {
@@ -314,11 +452,13 @@ body {
 }
 
 .bc-page-title {
-  font-weight: 800;
-  font-size: 30px;
+  font-family: var(--font-display) !important;
+  font-weight: 400;
+  font-size: 38px;
   margin: 0;
   color: var(--ink);
-  letter-spacing: -0.02em;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .bc-page-sub {
@@ -416,12 +556,14 @@ body {
     flex-direction: column;
   }
   .bc-sidebar {
-    width: 100%;
+    width: 100% !important;
     padding: 16px;
   }
-  .bc-main {
+  .bc-sidebar.collapsed {
+    width: 100% !important;
+  }
+  .bc-main-content {
     padding: 20px 16px 40px;
-    max-height: none;
   }
   .bc-grid-4, .bc-grid-3, .bc-grid-2 {
     grid-template-columns: 1fr;
@@ -455,11 +597,13 @@ body {
 }
 
 .bc-section-title {
-  font-weight: 700;
-  font-size: 18px;
+  font-family: var(--font-display) !important;
+  font-weight: 400;
+  font-size: 22px;
   margin: 0 0 16px;
   color: var(--ink);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 /* Ledger & List items */
@@ -518,9 +662,12 @@ body {
   font-size: 13.5px;
 }
 .bc-empty .bc-empty-title {
-  font-size: 19px;
+  font-family: var(--font-display) !important;
+  font-size: 24px;
   color: var(--ink);
-  font-weight: 700;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 /* Modals */
@@ -555,10 +702,13 @@ body {
   margin-bottom: 20px;
 }
 .bc-modal-title {
-  font-weight: 700;
-  font-size: 20px;
+  font-family: var(--font-display) !important;
+  font-weight: 400;
+  font-size: 26px;
   color: var(--ink);
   margin: 0;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 .bc-close-btn {
   background: transparent;
@@ -781,11 +931,14 @@ body {
   gap: 12px;
 }
 .bc-kanban-col-title {
+  font-family: var(--font-display) !important;
   padding-bottom: 10px;
   border-bottom: 2px solid #E2E8F0;
-  font-weight: 700;
-  font-size: 15px;
+  font-weight: 400;
+  font-size: 18px;
   color: var(--purple-dark);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .bc-kanban-card {

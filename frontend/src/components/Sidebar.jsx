@@ -1,12 +1,11 @@
 import React from "react";
 import {
   LayoutDashboard, Target, BookOpen, FileText, CheckSquare,
-  Archive, Settings, LogOut, ShieldCheck, Users, Briefcase
+  Archive, Settings, Users, Briefcase, ShieldCheck,
+  PanelLeftClose, PanelLeftOpen
 } from "lucide-react";
 
-export function Sidebar({ activeTab, setActiveTab, currentUser, onLogout }) {
-  const role = (currentUser?.role || "admin").toLowerCase();
-
+export function Sidebar({ activeTab, setActiveTab, collapsed, onToggleCollapse }) {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
     { id: "goals", label: "Goals", icon: <Target size={18} /> },
@@ -20,16 +19,26 @@ export function Sidebar({ activeTab, setActiveTab, currentUser, onLogout }) {
   ];
 
   return (
-    <aside className="bc-sidebar">
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 8px 4px" }}>
-          <ShieldCheck size={22} color="#09090B" />
-          <p className="bc-logo" style={{ margin: 0 }}>VOUTA</p>
+    <aside className={`bc-sidebar ${collapsed ? "collapsed" : ""}`}>
+      <button
+        className="bc-sidebar-toggle"
+        onClick={onToggleCollapse}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+      </button>
+
+      <div style={{ marginTop: 6, marginBottom: collapsed ? 12 : 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: collapsed ? "0 auto" : "0 4px 4px" }}>
+          {!collapsed && <ShieldCheck size={22} color="#7C3AED" />}
+          <p className="bc-logo" style={{ margin: 0 }}>
+            {collapsed ? "V" : "VOUTA"}
+          </p>
         </div>
-        <p className="bc-logo-sub">Business Console</p>
+        {!collapsed && <p className="bc-logo-sub">Business Console</p>}
       </div>
 
-      <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <nav style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: collapsed ? 8 : 0 }}>
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           return (
@@ -37,40 +46,14 @@ export function Sidebar({ activeTab, setActiveTab, currentUser, onLogout }) {
               key={item.id}
               className={`bc-nav-item ${isActive ? "active" : ""}`}
               onClick={() => setActiveTab(item.id)}
+              title={collapsed ? item.label : undefined}
             >
               <span className="bc-nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
+              <span className="bc-nav-label">{item.label}</span>
             </button>
           );
         })}
       </nav>
-
-      {currentUser && (
-        <div className="bc-user-panel">
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#09090B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {currentUser.businessName || "My Business"}
-            </span>
-            <span className={`bc-role-badge ${role}`}>
-              {role}
-            </span>
-          </div>
-          <div className="bc-user-info">
-            {currentUser.ownerName || currentUser.email}
-          </div>
-          <button
-            className="bc-btn bc-btn-ghost bc-btn-sm"
-            onClick={onLogout}
-            style={{
-              width: "100%",
-              justifyContent: "center",
-              marginTop: 8,
-            }}
-          >
-            <LogOut size={13} /> Sign Out
-          </button>
-        </div>
-      )}
     </aside>
   );
 }

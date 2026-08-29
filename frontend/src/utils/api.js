@@ -1,28 +1,28 @@
 /**
  * Vouta API Client
  * Centralised fetch wrapper that:
- *  - In development: calls /api/* — Vite proxy forwards to localhost:4000
- *  - In production (Vercel): calls VITE_API_URL (the backend Vercel URL) + /api/*
+ *  - In development: calls /api/* (Vite proxy forwards to localhost:4000)
+ *  - In production: calls VITE_API_URL (the backend URL) + /api/*
  *  - Attaches JWT Bearer token to every request (stored in sessionStorage)
  *  - Auto-clears token and reloads on 401
  */
 
 // VITE_API_URL should be set in frontend/.env.production to your backend URL
 // e.g. https://vouta-api.vercel.app
-// Leave empty locally — Vite proxy handles it.
+// Leave empty locally, Vite proxy handles it.
 const BASE_URL = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
   : "/api";
 
 
-// ─── Token management ─────────────────────────────────────────────
+// Token management
 export const token = {
   get: () => sessionStorage.getItem("vouta_token"),
   set: (t) => sessionStorage.setItem("vouta_token", t),
   clear: () => sessionStorage.removeItem("vouta_token"),
 };
 
-// ─── Core fetch wrapper ───────────────────────────────────────────
+// Core fetch wrapper
 async function request(method, path, body) {
   const headers = { "Content-Type": "application/json" };
   const t = token.get();
@@ -61,7 +61,7 @@ const post   = (path, body)  => request("POST",   path, body);
 const patch  = (path, body)  => request("PATCH",  path, body);
 const del    = (path)        => request("DELETE",  path);
 
-// ─── Auth ─────────────────────────────────────────────────────────
+// Auth
 export const auth = {
   register: (data)  => post("/auth/register", data),
   login:    (data)  => post("/auth/login", data),
@@ -73,7 +73,7 @@ export const auth = {
   removeMember: (id) => del(`/auth/members/${id}`),
 };
 
-// ─── Goals ────────────────────────────────────────────────────────
+// Goals
 export const goals = {
   list:    ()           => get("/goals"),
   create:  (data)       => post("/goals", data),
@@ -81,14 +81,14 @@ export const goals = {
   remove:  (id)         => del(`/goals/${id}`),
 };
 
-// ─── Transactions (Ledger) ────────────────────────────────────────
+// Transactions (Ledger)
 export const transactions = {
   list:    ()     => get("/transactions"),
   create:  (data) => post("/transactions", data),
   remove:  (id)   => del(`/transactions/${id}`),
 };
 
-// ─── Invoices ─────────────────────────────────────────────────────
+// Invoices
 export const invoices = {
   list:         ()           => get("/invoices"),
   create:       (data)       => post("/invoices", data),
@@ -96,7 +96,7 @@ export const invoices = {
   remove:       (id)         => del(`/invoices/${id}`),
 };
 
-// ─── Todos ────────────────────────────────────────────────────────
+// Todos
 export const todos = {
   list:   ()   => get("/todos"),
   create: (data) => post("/todos", data),
@@ -104,7 +104,7 @@ export const todos = {
   remove: (id)   => del(`/todos/${id}`),
 };
 
-// ─── Team ─────────────────────────────────────────────────────────
+// Team
 export const team = {
   list:        ()     => get("/team"),
   create:      (data) => post("/team", data),
@@ -112,7 +112,7 @@ export const team = {
   remove:      (id)   => del(`/team/${id}`),
 };
 
-// ─── Projects ─────────────────────────────────────────────────────
+// Projects
 export const projects = {
   list:         ()           => get("/projects"),
   create:       (data)       => post("/projects", data),
@@ -120,7 +120,7 @@ export const projects = {
   remove:       (id)         => del(`/projects/${id}`),
 };
 
-// ─── Project Tasks (Kanban) ───────────────────────────────────────
+// Project Tasks (Kanban)
 export const projectTasks = {
   list:   (projectId) => get(`/project-tasks?projectId=${projectId}`),
   create: (data)      => post("/project-tasks", data),
@@ -128,7 +128,7 @@ export const projectTasks = {
   remove: (id)        => del(`/project-tasks/${id}`),
 };
 
-// ─── Documents ────────────────────────────────────────────────────
+// Documents
 export const documents = {
   list:   (params = {}) => {
     const qs = new URLSearchParams(params).toString();

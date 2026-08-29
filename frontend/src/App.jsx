@@ -14,16 +14,37 @@ import { ProjectsView } from "./components/ProjectsView";
 import { DocumentsView } from "./components/DocumentsView";
 import { SettingsView } from "./components/SettingsView";
 
+function UserWidget({ currentUser }) {
+  const name = currentUser?.ownerName || currentUser?.email || "User";
+  const company = currentUser?.businessName || "My Business";
+  const role = (currentUser?.role || "admin").toLowerCase();
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+
+  return (
+    <div className="bc-user-widget">
+      <div className="bc-user-widget-avatar">{initials}</div>
+      <div className="bc-user-widget-details">
+        <span className="bc-user-widget-name">{name}</span>
+        <span className="bc-user-widget-company">{company}</span>
+      </div>
+      <span className={`bc-role-badge ${role}`} style={{ marginLeft: 4 }}>
+        {role}
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
   const { currentUser, setCurrentUser, authLoading } = useAuthState();
   const { data, loading: dataLoading, error, refetch, updateResource } = useConsoleData(!!currentUser);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   if (authLoading) {
     return (
       <div className="bc-auth-page">
         <p style={{ fontSize: 20, fontWeight: 600, color: "#A1A1AA" }}>
-          Loading Console…
+          Loading Console...
         </p>
       </div>
     );
@@ -53,36 +74,42 @@ export default function App() {
         <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          currentUser={currentUser}
-          onLogout={handleLogout}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
         <main className="bc-main">
-          {dataLoading && (
-            <div style={{ padding: "60px 0", textAlign: "center", color: "#A1A1AA" }}>
-              Loading data…
-            </div>
-          )}
-          {error && !dataLoading && (
-            <div className="bc-card" style={{ borderColor: "#3F3F46", marginBottom: 20 }}>
-              <p style={{ color: "#FAFAFA", fontWeight: 600, margin: 0 }}>
-                Could not reach server: {error}
-              </p>
-            </div>
-          )}
+          <div className="bc-header-bar">
+            <UserWidget currentUser={currentUser} />
+          </div>
 
-          {!dataLoading && (
-            <>
-              {activeTab === "dashboard"  && <Dashboard {...sharedProps} setActiveTab={setActiveTab} />}
-              {activeTab === "goals"      && <GoalsView {...sharedProps} />}
-              {activeTab === "ledger"     && <LedgerView {...sharedProps} />}
-              {activeTab === "invoices"   && <InvoicesView {...sharedProps} />}
-              {activeTab === "todos"      && <TodosView {...sharedProps} />}
-              {activeTab === "team"       && <TeamView {...sharedProps} />}
-              {activeTab === "projects"   && <ProjectsView {...sharedProps} />}
-              {activeTab === "documents"  && <DocumentsView {...sharedProps} />}
-              {activeTab === "settings"   && <SettingsView currentUser={currentUser} setCurrentUser={setCurrentUser} />}
-            </>
-          )}
+          <div className="bc-main-content">
+            {dataLoading && (
+              <div style={{ padding: "60px 0", textAlign: "center", color: "#A1A1AA" }}>
+                Loading data...
+              </div>
+            )}
+            {error && !dataLoading && (
+              <div className="bc-card" style={{ borderColor: "#FCA5A5", marginBottom: 20 }}>
+                <p style={{ color: "#EF4444", fontWeight: 600, margin: 0 }}>
+                  Could not reach server: {error}
+                </p>
+              </div>
+            )}
+
+            {!dataLoading && (
+              <>
+                {activeTab === "dashboard"  && <Dashboard {...sharedProps} setActiveTab={setActiveTab} />}
+                {activeTab === "goals"      && <GoalsView {...sharedProps} />}
+                {activeTab === "ledger"     && <LedgerView {...sharedProps} />}
+                {activeTab === "invoices"   && <InvoicesView {...sharedProps} />}
+                {activeTab === "todos"      && <TodosView {...sharedProps} />}
+                {activeTab === "team"       && <TeamView {...sharedProps} />}
+                {activeTab === "projects"   && <ProjectsView {...sharedProps} />}
+                {activeTab === "documents"  && <DocumentsView {...sharedProps} />}
+                {activeTab === "settings"   && <SettingsView currentUser={currentUser} setCurrentUser={setCurrentUser} onLogout={handleLogout} />}
+              </>
+            )}
+          </div>
         </main>
       </div>
     </div>

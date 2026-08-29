@@ -64,7 +64,7 @@ export function useConsoleData(enabled = true) {
 }
 
 /**
- * Auth state hook — validates existing JWT on mount via /api/auth/me.
+ * Auth state hook - validates existing JWT on mount via /api/auth/me.
  */
 export function useAuthState() {
   const [currentUser, setCurrentUser] = useState(null);

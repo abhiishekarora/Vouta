@@ -102,4 +102,4 @@ export const PRIORITY_COLORS = {
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// hashPassword removed — passwords are hashed server-side with bcrypt.
+// hashPassword removed - passwords are hashed server-side with bcrypt.

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Save, UserPlus, Trash2, Shield, Eye, Edit2, ShieldAlert } from "lucide-react";
+import { Save, UserPlus, Trash2, Shield, Eye, Edit2, ShieldAlert, LogOut } from "lucide-react";
 import { BUSINESS_TYPES } from "../utils/helpers";
 import * as api from "../utils/api";
 
-export function SettingsView({ currentUser, setCurrentUser }) {
+export function SettingsView({ currentUser, setCurrentUser, onLogout }) {
   const [form, setForm] = useState({
     ownerName: currentUser?.ownerName ?? "",
     businessName: currentUser?.businessName ?? "",
@@ -103,7 +103,7 @@ export function SettingsView({ currentUser, setCurrentUser }) {
     <div style={{ maxWidth: 780 }}>
       <div className="bc-topbar">
         <div>
-          <h1 className="bc-page-title">Settings & Access Control</h1>
+          <h1 className="bc-page-title">Settings & Access</h1>
           <p className="bc-page-sub">Manage entity details, workspace partner invites, and role permissions.</p>
         </div>
       </div>
@@ -114,8 +114,8 @@ export function SettingsView({ currentUser, setCurrentUser }) {
           <h2 className="bc-section-title">Business Profile</h2>
           {error && <p className="bc-error-text">{error}</p>}
           {saved && (
-            <p style={{ color: "#FAFAFA", fontWeight: 700, marginBottom: 12, fontSize: 13 }}>
-              ✔ Profile updated successfully.
+            <p style={{ color: "#059669", fontWeight: 700, marginBottom: 12, fontSize: 13 }}>
+              Profile updated successfully.
             </p>
           )}
 
@@ -149,7 +149,7 @@ export function SettingsView({ currentUser, setCurrentUser }) {
             </select>
           </div>
 
-          <div style={{ borderTop: "1px solid #27272A", paddingTop: 14, marginTop: 14 }}>
+          <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 14, marginTop: 14 }}>
             <p style={{ margin: 0, fontSize: 12, color: "var(--ink-soft)" }}>
               Signed in as: <strong>{currentUser?.email}</strong>
               <span className={`bc-role-badge ${(currentUser?.role || "admin").toLowerCase()}`}>
@@ -161,15 +161,30 @@ export function SettingsView({ currentUser, setCurrentUser }) {
           {isAdmin && (
             <button className="bc-btn bc-btn-primary" onClick={handleSaveProfile} disabled={saving} style={{ marginTop: 14, width: "100%", justifyContent: "center" }}>
               <Save size={15} />
-              {saving ? "Saving…" : "Save Changes"}
+              {saving ? "Saving..." : "Save Changes"}
             </button>
           )}
+
+          {/* Sign Out */}
+          <button
+            className="bc-btn bc-btn-ghost"
+            onClick={onLogout}
+            style={{
+              width: "100%",
+              justifyContent: "center",
+              marginTop: 12,
+              color: "#EF4444",
+              borderColor: "#FCA5A5",
+            }}
+          >
+            <LogOut size={15} /> Sign Out
+          </button>
         </div>
 
         {/* Partner Invites & Roles */}
         <div className="bc-card">
           <h2 className="bc-section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <UserPlus size={18} /> Partner & Member Access
+            <UserPlus size={18} /> Partner Access
           </h2>
           <p style={{ fontSize: 12.5, color: "var(--ink-soft)", marginBottom: 16 }}>
             Give partners or co-founders access to this dashboard with granular roles.
@@ -179,8 +194,8 @@ export function SettingsView({ currentUser, setCurrentUser }) {
             <>
               {inviteError && <p className="bc-error-text">{inviteError}</p>}
               {inviteSuccess && (
-                <p style={{ color: "#FAFAFA", fontSize: 12.5, fontWeight: 600, marginBottom: 12 }}>
-                  ✔ {inviteSuccess}
+                <p style={{ color: "#059669", fontSize: 12.5, fontWeight: 600, marginBottom: 12 }}>
+                  {inviteSuccess}
                 </p>
               )}
 
@@ -215,27 +230,27 @@ export function SettingsView({ currentUser, setCurrentUser }) {
                   style={{ width: "100%", justifyContent: "center" }}
                 >
                   <UserPlus size={15} />
-                  {inviting ? "Granting Access…" : "Invite Partner"}
+                  {inviting ? "Granting Access..." : "Invite Partner"}
                 </button>
               </form>
 
               {/* Members List */}
-              <div style={{ borderTop: "1px solid #27272A", paddingTop: 14 }}>
+              <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 14 }}>
                 <p style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)", marginBottom: 10 }}>
                   Active Workspace Partners ({members.length})
                 </p>
 
                 {membersLoading ? (
-                  <p style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>Loading partners…</p>
+                  <p style={{ fontSize: 12.5, color: "var(--ink-soft)" }}>Loading partners...</p>
                 ) : members.length === 0 ? (
                   <p style={{ fontSize: 12.5, color: "var(--ink-soft)", margin: 0 }}>
                     No partners invited yet. Add partner emails above.
                   </p>
                 ) : (
                   members.map((m) => (
-                    <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #27272A" }}>
+                    <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #F1F5F9" }}>
                       <div>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#FFFFFF" }}>{m.email}</p>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{m.email}</p>
                         <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "var(--ink-soft)" }}>
                           Added {m.created_at?.slice(0, 10)}
                         </p>
@@ -262,8 +277,8 @@ export function SettingsView({ currentUser, setCurrentUser }) {
             </>
           ) : (
             <div style={{ padding: "20px 0", textAlign: "center", color: "var(--ink-soft)" }}>
-              <ShieldAlert size={28} style={{ margin: "0 auto 8px", display: "block", color: "#A1A1AA" }} />
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#FFFFFF", margin: 0 }}>
+              <ShieldAlert size={28} style={{ margin: "0 auto 8px", display: "block", color: "#94A3B8" }} />
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", margin: 0 }}>
                 Read-Only Member View
               </p>
               <p style={{ fontSize: 12, marginTop: 4 }}>
