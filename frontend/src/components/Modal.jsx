@@ -18,15 +18,8 @@ export function Modal({ title, onClose, children }) {
 }
 
 export function Stamp({ status }) {
-  const STAMP_STYLES = {
-    paid: { label: "Paid", color: "var(--teal)" },
-    sent: { label: "Sent", color: "var(--brass)" },
-    draft: { label: "Draft", color: "var(--ink-soft)" },
-    overdue: { label: "Overdue", color: "var(--brick)" },
-  };
-  const s = STAMP_STYLES[status] || STAMP_STYLES.draft;
   return (
-    <span className="bc-stamp" style={{ color: s.color }}>{s.label}</span>
+    <span className="bc-status-chip">{status?.toUpperCase()}</span>
   );
 }
 
@@ -34,7 +27,7 @@ export function EmptyState({ title, body, action }) {
   return (
     <div className="bc-empty">
       <p className="bc-empty-title">{title}</p>
-      <p>{body}</p>
+      <p style={{ color: "var(--ink-soft)" }}>{body}</p>
       {action}
     </div>
   );
@@ -43,9 +36,9 @@ export function EmptyState({ title, body, action }) {
 export function StatCard({ label, value, icon, tint, textColor }) {
   return (
     <div className="bc-card">
-      <div className="bc-stat-icon" style={{ background: tint, color: textColor }}>{icon}</div>
+      <div className="bc-stat-icon" style={{ background: tint || "#09090B", color: textColor || "#FFFFFF" }}>{icon}</div>
       <p className="bc-stat-label">{label}</p>
-      <p className="bc-stat-value" style={{ color: textColor || "var(--ink)" }}>{value}</p>
+      <p className="bc-stat-value" style={{ color: "#09090B" }}>{value}</p>
     </div>
   );
 }

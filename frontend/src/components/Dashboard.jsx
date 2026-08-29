@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { Wallet, TrendingUp, TrendingDown, FileText, AlertCircle } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { StatCard, EmptyState } from "./Modal";
-import { INR, monthKey, monthLabel, computeDocStatus, DOC_STATUS_STYLES, PRIORITY_STYLES } from "../utils/helpers";
+import { INR, monthKey, monthLabel, computeDocStatus, DOC_STATUS_STYLES } from "../utils/helpers";
 
 export function Dashboard({ data, setActiveTab }) {
   const now = new Date();
@@ -54,10 +54,10 @@ export function Dashboard({ data, setActiveTab }) {
       </div>
 
       {docAlerts.length > 0 && (
-        <div className="bc-card" style={{ marginBottom: 20, borderColor: "var(--brick)", background: "#FDF8F7" }}>
+        <div className="bc-card" style={{ marginBottom: 20, borderColor: "#09090B", background: "#FFFFFF" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <AlertCircle size={18} color="var(--brick)" />
-            <p className="bc-section-title" style={{ color: "var(--brick)", margin: 0 }}>
+            <AlertCircle size={18} color="#09090B" />
+            <p className="bc-section-title" style={{ color: "#09090B", margin: 0 }}>
               Compliance documents needing attention ({docAlerts.length})
             </p>
           </div>
@@ -65,11 +65,11 @@ export function Dashboard({ data, setActiveTab }) {
             const s = computeDocStatus(d);
             return (
               <div key={d.id} className="bc-ledger-row">
-                <span style={{ flex: 1, fontWeight: 500 }}>{d.title}</span>
-                <span style={{ fontSize: 12, color: "var(--ink-soft)", fontFamily: "IBM Plex Mono, monospace" }}>
+                <span style={{ flex: 1, fontWeight: 600, color: "#09090B" }}>{d.title}</span>
+                <span style={{ fontSize: 12, color: "var(--ink-soft)", fontFamily: "JetBrains Mono, monospace" }}>
                   {d.expiryDate ? `Expires ${d.expiryDate}` : "No expiry date"}
                 </span>
-                <span className="bc-tag" style={{ color: DOC_STATUS_STYLES[s]?.color || "var(--brick)", background: "transparent", border: "1px solid currentColor" }}>
+                <span className="bc-tag">
                   {s}
                 </span>
               </div>
@@ -86,10 +86,10 @@ export function Dashboard({ data, setActiveTab }) {
       )}
 
       <div className="bc-grid bc-grid-4" style={{ marginBottom: 20 }}>
-        <StatCard label="Total balance" value={INR(allBalance)} icon={<Wallet size={16} />} tint="var(--teal-light)" textColor="var(--teal)" />
-        <StatCard label="Income this month" value={INR(income)} icon={<TrendingUp size={16} />} tint="var(--teal-light)" textColor="var(--teal)" />
-        <StatCard label="Expenses this month" value={INR(expense)} icon={<TrendingDown size={16} />} tint="var(--brick-light)" textColor="var(--brick)" />
-        <StatCard label="Invoices outstanding" value={dueInvoices.length} icon={<FileText size={16} />} tint="#F1E6D2" textColor="var(--brass-dark)" />
+        <StatCard label="Total balance" value={INR(allBalance)} icon={<Wallet size={16} />} tint="#09090B" textColor="#FFFFFF" />
+        <StatCard label="Income this month" value={INR(income)} icon={<TrendingUp size={16} />} tint="#09090B" textColor="#FFFFFF" />
+        <StatCard label="Expenses this month" value={INR(expense)} icon={<TrendingDown size={16} />} tint="#27272A" textColor="#FFFFFF" />
+        <StatCard label="Invoices outstanding" value={dueInvoices.length} icon={<FileText size={16} />} tint="#09090B" textColor="#FFFFFF" />
       </div>
 
       <div className="bc-grid bc-grid-2" style={{ alignItems: "start" }}>
@@ -98,12 +98,12 @@ export function Dashboard({ data, setActiveTab }) {
           <div style={{ height: 230, marginTop: 10 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
-                <CartesianGrid stroke="var(--paper-line)" vertical={false} strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "var(--ink-soft)" }} axisLine={{ stroke: "var(--paper-line)" }} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: "var(--ink-soft)" }} axisLine={false} tickLine={false} width={48} tickFormatter={(v) => (v >= 1000 ? (v / 1000) + "k" : v)} />
-                <Tooltip formatter={(v) => [INR(v), ""]} contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid var(--paper-line)", background: "#FAFAF3" }} />
-                <Bar dataKey="Income" fill="#2F6F62" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="Expenses" fill="#A63D2F" radius={[3, 3, 0, 0]} />
+                <CartesianGrid stroke="#E4E4E7" vertical={false} strokeDasharray="3 3" />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#71717A" }} axisLine={{ stroke: "#E4E4E7" }} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#71717A" }} axisLine={false} tickLine={false} width={48} tickFormatter={(v) => (v >= 1000 ? (v / 1000) + "k" : v)} />
+                <Tooltip formatter={(v) => [INR(v), ""]} contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E4E4E7", background: "#FFFFFF", color: "#09090B" }} />
+                <Bar dataKey="Income" fill="#09090B" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Expenses" fill="#A1A1AA" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -119,9 +119,9 @@ export function Dashboard({ data, setActiveTab }) {
           ) : (
             openTodos.slice(0, 5).map((t) => (
               <div key={t.id} className="bc-ledger-row">
-                <span style={{ flex: 1 }}>{t.text}</span>
-                <span className="bc-tag" style={{ color: PRIORITY_STYLES[t.priority]?.color, background: "transparent" }}>
-                  {PRIORITY_STYLES[t.priority]?.label}
+                <span style={{ flex: 1, fontWeight: 500, color: "#09090B" }}>{t.text}</span>
+                <span className="bc-tag">
+                  {t.priority?.toUpperCase()}
                 </span>
               </div>
             ))
@@ -148,12 +148,12 @@ export function Dashboard({ data, setActiveTab }) {
         ) : (
           recentTx.map((t) => (
             <div key={t.id} className="bc-ledger-row">
-              <span style={{ color: "var(--ink-soft)", fontFamily: "IBM Plex Mono, monospace", fontSize: 12, width: 85 }}>{t.date}</span>
-              <span style={{ width: 140, fontWeight: 500 }}>{t.category}</span>
+              <span style={{ color: "var(--ink-soft)", fontFamily: "JetBrains Mono, monospace", fontSize: 12, width: 95 }}>{t.date}</span>
+              <span style={{ width: 140, fontWeight: 600, color: "#09090B" }}>{t.category}</span>
               <span style={{ color: "var(--ink-soft)", flex: 1, fontSize: 12.5 }}>{t.note}</span>
               <span
                 className="bc-ledger-amount"
-                style={{ color: t.type === "income" ? "var(--teal)" : "var(--brick)" }}
+                style={{ color: t.type === "income" ? "#09090B" : "#71717A" }}
               >
                 {t.type === "income" ? "+" : "-"}{INR(t.amount)}
               </span>

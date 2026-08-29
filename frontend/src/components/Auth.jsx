@@ -57,10 +57,11 @@ export function Auth({ onLoginSuccess }) {
       <div className="bc-auth-card">
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
           <div style={{
-            width: 44, height: 44, borderRadius: 10, background: "var(--sidebar)",
-            display: "flex", alignItems: "center", justifyContent: "center", color: "#EDE6D6",
+            width: 46, height: 46, borderRadius: 10, background: "#09090B",
+            display: "flex", alignItems: "center", justifyContent: "center", color: "#FFFFFF",
+            boxShadow: "0 6px 16px rgba(9, 9, 11, 0.15)",
           }}>
-            <ShieldCheck size={24} />
+            <ShieldCheck size={26} />
           </div>
         </div>
 
@@ -88,11 +89,11 @@ export function Auth({ onLoginSuccess }) {
                   placeholder="founder@company.in"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  style={{ paddingLeft: 34 }}
+                  style={{ paddingLeft: 36 }}
                   autoFocus
                   required
                 />
-                <Mail size={16} style={{ position: "absolute", left: 10, top: 12, color: "var(--ink-soft)" }} />
+                <Mail size={16} style={{ position: "absolute", left: 12, top: 13, color: "#A1A1AA" }} />
               </div>
             </div>
 
@@ -105,10 +106,10 @@ export function Auth({ onLoginSuccess }) {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  style={{ paddingLeft: 34 }}
+                  style={{ paddingLeft: 36 }}
                   required
                 />
-                <Lock size={16} style={{ position: "absolute", left: 10, top: 12, color: "var(--ink-soft)" }} />
+                <Lock size={16} style={{ position: "absolute", left: 12, top: 13, color: "#A1A1AA" }} />
               </div>
             </div>
 
@@ -116,7 +117,7 @@ export function Auth({ onLoginSuccess }) {
               className="bc-btn bc-btn-primary"
               type="submit"
               disabled={loading}
-              style={{ width: "100%", justifyContent: "center", marginTop: 8, opacity: loading ? 0.7 : 1 }}
+              style={{ width: "100%", justifyContent: "center", marginTop: 10, opacity: loading ? 0.7 : 1 }}
             >
               {loading ? "Signing in…" : (<>Sign In to Console <ArrowRight size={16} /></>)}
             </button>
@@ -138,11 +139,11 @@ export function Auth({ onLoginSuccess }) {
                   placeholder="e.g. Ananya Sharma"
                   value={ownerName}
                   onChange={(e) => setOwnerName(e.target.value)}
-                  style={{ paddingLeft: 34 }}
+                  style={{ paddingLeft: 36 }}
                   autoFocus
                   required
                 />
-                <User size={16} style={{ position: "absolute", left: 10, top: 12, color: "var(--ink-soft)" }} />
+                <User size={16} style={{ position: "absolute", left: 12, top: 13, color: "#A1A1AA" }} />
               </div>
             </div>
 
@@ -154,10 +155,10 @@ export function Auth({ onLoginSuccess }) {
                   placeholder="e.g. Nexus Software Pvt Ltd"
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
-                  style={{ paddingLeft: 34 }}
+                  style={{ paddingLeft: 36 }}
                   required
                 />
-                <Building2 size={16} style={{ position: "absolute", left: 10, top: 12, color: "var(--ink-soft)" }} />
+                <Building2 size={16} style={{ position: "absolute", left: 12, top: 13, color: "#A1A1AA" }} />
               </div>
             </div>
 
@@ -196,7 +197,7 @@ export function Auth({ onLoginSuccess }) {
               className="bc-btn bc-btn-primary"
               type="submit"
               disabled={loading}
-              style={{ width: "100%", justifyContent: "center", marginTop: 8, opacity: loading ? 0.7 : 1 }}
+              style={{ width: "100%", justifyContent: "center", marginTop: 10, opacity: loading ? 0.7 : 1 }}
             >
               {loading ? "Creating account…" : (<>Create Business Account <ArrowRight size={16} /></>)}
             </button>
