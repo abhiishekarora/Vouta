@@ -1,16 +1,18 @@
 import React, { useState } from "react";
-import { Plus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, Eye } from "lucide-react";
 import { Modal, StatCard, EmptyState } from "./Modal";
 import { INR, todayISO, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "../utils/helpers";
 import * as api from "../utils/api";
 
-export function LedgerView({ data, refetch }) {
+export function LedgerView({ data, refetch, userRole = "admin" }) {
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState("all");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     type: "expense", amount: "", category: EXPENSE_CATEGORIES[0], date: todayISO(), note: "",
   });
+
+  const canEdit = userRole !== "view";
 
   const addTx = async () => {
     if (!form.amount || !form.category) return;
@@ -44,14 +46,20 @@ export function LedgerView({ data, refetch }) {
           <h1 className="bc-page-title">Ledger</h1>
           <p className="bc-page-sub">Comprehensive transaction history of income and expenses.</p>
         </div>
-        <button className="bc-btn bc-btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={15} /> Add Entry
-        </button>
+        {canEdit ? (
+          <button className="bc-btn bc-btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={15} /> Add Entry
+          </button>
+        ) : (
+          <span className="bc-role-badge view" style={{ padding: "6px 12px", fontSize: 12 }}>
+            <Eye size={13} style={{ marginRight: 4, verticalAlign: "middle" }} /> Read-Only View
+          </span>
+        )}
       </div>
 
       <div className="bc-grid bc-grid-2" style={{ marginBottom: 20 }}>
-        <StatCard label="Total Income Recorded" value={INR(totalIncome)} icon={<TrendingUp size={16} />} tint="var(--teal-light)" textColor="var(--teal)" />
-        <StatCard label="Total Expenses Recorded" value={INR(totalExpense)} icon={<TrendingDown size={16} />} tint="var(--brick-light)" textColor="var(--brick)" />
+        <StatCard label="Total Income Recorded" value={INR(totalIncome)} icon={<TrendingUp size={16} />} tint="#18181B" textColor="#FFFFFF" />
+        <StatCard label="Total Expenses Recorded" value={INR(totalExpense)} icon={<TrendingDown size={16} />} tint="#18181B" textColor="#E4E4E7" />
       </div>
 
       <div className="bc-tab-list">
@@ -69,20 +77,22 @@ export function LedgerView({ data, refetch }) {
           filtered.map((t) => (
             <div key={t.id} className="bc-ledger-row">
               <span style={{ color: "var(--ink-soft)", fontFamily: "IBM Plex Mono, monospace", fontSize: 12, width: 85 }}>{t.date}</span>
-              <span style={{ width: 150, fontWeight: 600 }}>{t.category}</span>
+              <span style={{ width: 150, fontWeight: 600, color: "#FFFFFF" }}>{t.category}</span>
               <span style={{ color: "var(--ink-soft)", flex: 1 }}>{t.note}</span>
-              <span className="bc-ledger-amount" style={{ color: t.type === "income" ? "var(--teal)" : "var(--brick)" }}>
+              <span className="bc-ledger-amount" style={{ color: t.type === "income" ? "#FFFFFF" : "#A1A1AA" }}>
                 {t.type === "income" ? "+" : "-"}{INR(t.amount)}
               </span>
-              <button className="bc-icon-btn" onClick={() => removeTx(t.id)} aria-label="Delete entry">
-                <Trash2 size={14} />
-              </button>
+              {canEdit && (
+                <button className="bc-icon-btn" onClick={() => removeTx(t.id)} aria-label="Delete entry">
+                  <Trash2 size={14} />
+                </button>
+              )}
             </div>
           ))
         )}
       </div>
 
-      {showModal && (
+      {showModal && canEdit && (
         <Modal title="Add Ledger Entry" onClose={() => setShowModal(false)}>
           <div className="bc-toggle-group">
             <div className={"bc-toggle" + (form.type === "income" ? " active-income" : "")}

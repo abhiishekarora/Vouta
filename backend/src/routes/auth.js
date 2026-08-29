@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const { z } = require("zod");
 const { pool } = require("../config/db");
 const { validate } = require("../middleware/validate");
-const { authenticate } = require("../middleware/auth");
+const { authenticate, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -28,9 +28,17 @@ const profileSchema = z.object({
   businessType: z.string().max(100).trim().optional(),
 });
 
+const inviteSchema = z.object({
+  email: z.string().email("Invalid email.").toLowerCase(),
+  role: z.enum(["view", "edit", "admin"]).default("view"),
+});
+
+const roleSchema = z.object({
+  role: z.enum(["view", "edit", "admin"]),
+});
+
 const DEFAULT_JWT_SECRET = "00a659ca0fda44eb79130032f81bf750850a0a7b347175b9834bbd1afe75a327d68f60ee9ccf5ad42e4a040c103606dbeb3e6e3f360de26c91b9429d29484ee6";
 
-// ─── Token helper ─────────────────────────────────────────────────
 function signToken(user) {
   return jwt.sign(
     {
@@ -47,18 +55,12 @@ function signToken(user) {
 router.post("/register", validate(registerSchema), async (req, res) => {
   const { email, password, ownerName, businessName, businessType } = req.body;
   try {
-    // Check duplicate
-    const existing = await pool.query(
-      "SELECT id FROM users WHERE email = $1",
-      [email]
-    );
+    const existing = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: "An account with this email already exists." });
     }
 
-    // Hash password with bcrypt cost factor 12
     const passwordHash = await bcrypt.hash(password, 12);
-
     const { rows } = await pool.query(
       `INSERT INTO users (email, password_hash, owner_name, business_name, business_type)
        VALUES ($1, $2, $3, $4, $5)
@@ -68,7 +70,7 @@ router.post("/register", validate(registerSchema), async (req, res) => {
 
     const user = rows[0];
     const token = signToken(user);
-    return res.status(201).json({ token, user: sanitizeUser(user) });
+    return res.status(201).json({ token, user: sanitizeUser(user, "admin") });
   } catch (err) {
     console.error("[Auth] Register error:", err.message);
     return res.status(500).json({ error: "Registration failed. Please try again." });
@@ -79,13 +81,9 @@ router.post("/register", validate(registerSchema), async (req, res) => {
 router.post("/login", validate(loginSchema), async (req, res) => {
   const { email, password } = req.body;
   try {
-    const { rows } = await pool.query(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
-    );
+    const { rows } = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     const user = rows[0];
 
-    // Constant-time comparison to prevent timing attacks
     const dummyHash = "$2a$12$invalidhashpadding00000000000000000000000000000000000000";
     const valid = user
       ? await bcrypt.compare(password, user.password_hash)
@@ -96,7 +94,7 @@ router.post("/login", validate(loginSchema), async (req, res) => {
     }
 
     const token = signToken(user);
-    return res.json({ token, user: sanitizeUser(user) });
+    return res.json({ token, user: sanitizeUser(user, "admin") });
   } catch (err) {
     console.error("[Auth] Login error:", err.message);
     return res.status(500).json({ error: "Login failed. Please try again." });
@@ -108,10 +106,10 @@ router.get("/me", authenticate, async (req, res) => {
   try {
     const { rows } = await pool.query(
       "SELECT id, email, owner_name, business_name, business_type, created_at FROM users WHERE id = $1",
-      [req.user.id]
+      [req.user.effectiveUserId || req.user.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "User not found." });
-    return res.json({ user: sanitizeUser(rows[0]) });
+    return res.json({ user: sanitizeUser(rows[0], req.user.role) });
   } catch (err) {
     console.error("[Auth] /me error:", err.message);
     return res.status(500).json({ error: "Failed to retrieve user." });
@@ -119,7 +117,7 @@ router.get("/me", authenticate, async (req, res) => {
 });
 
 // ─── PATCH /api/auth/profile ──────────────────────────────────────
-router.patch("/profile", authenticate, validate(profileSchema), async (req, res) => {
+router.patch("/profile", authenticate, requireRole(["admin", "edit"]), validate(profileSchema), async (req, res) => {
   const { ownerName, businessName, businessType } = req.body;
   const fields = [];
   const values = [];
@@ -133,28 +131,106 @@ router.patch("/profile", authenticate, validate(profileSchema), async (req, res)
     return res.status(400).json({ error: "No fields provided to update." });
   }
 
-  values.push(req.user.id);
+  values.push(req.user.effectiveUserId || req.user.id);
   try {
     const { rows } = await pool.query(
       `UPDATE users SET ${fields.join(", ")} WHERE id = $${idx}
        RETURNING id, email, owner_name, business_name, business_type, created_at`,
       values
     );
-    return res.json({ user: sanitizeUser(rows[0]) });
+    return res.json({ user: sanitizeUser(rows[0], req.user.role) });
   } catch (err) {
     console.error("[Auth] Profile update error:", err.message);
     return res.status(500).json({ error: "Failed to update profile." });
   }
 });
 
-// ─── Sanitize user (never expose password_hash) ───────────────────
-function sanitizeUser(u) {
+// ─── Workspace Partner Access Endpoints ────────────────────────────
+
+// GET /api/auth/members — List all partners invited to workspace
+router.get("/members", authenticate, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT wm.id, wm.email, wm.role, wm.status, wm.created_at, u.owner_name
+       FROM workspace_members wm
+       LEFT JOIN users u ON LOWER(u.email) = LOWER(wm.email)
+       WHERE wm.owner_id = $1
+       ORDER BY wm.created_at DESC`,
+      [req.user.effectiveUserId]
+    );
+    return res.json(rows);
+  } catch (err) {
+    console.error("[Auth] GET members error:", err.message);
+    return res.status(500).json({ error: "Failed to fetch workspace members." });
+  }
+});
+
+// POST /api/auth/invite — Invite partner by email + assign role
+router.post("/invite", authenticate, requireRole(["admin"]), validate(inviteSchema), async (req, res) => {
+  const { email, role } = req.body;
+  const ownerId = req.user.effectiveUserId;
+
+  try {
+    // Check if target user already exists
+    const userMatch = await pool.query("SELECT id FROM users WHERE LOWER(email) = LOWER($1)", [email]);
+    const targetUserId = userMatch.rows[0]?.id || null;
+
+    const { rows } = await pool.query(
+      `INSERT INTO workspace_members (owner_id, user_id, email, role, status)
+       VALUES ($1, $2, $3, $4, 'accepted')
+       ON CONFLICT (owner_id, email) DO UPDATE SET role = EXCLUDED.role, status = 'accepted'
+       RETURNING id, email, role, status, created_at`,
+      [ownerId, targetUserId, email, role]
+    );
+
+    return res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error("[Auth] Invite partner error:", err.message);
+    return res.status(500).json({ error: "Failed to invite workspace partner." });
+  }
+});
+
+// PATCH /api/auth/members/:id/role — Update a partner's role
+router.patch("/members/:id/role", authenticate, requireRole(["admin"]), validate(roleSchema), async (req, res) => {
+  const { role } = req.body;
+  try {
+    const { rows } = await pool.query(
+      `UPDATE workspace_members SET role = $1
+       WHERE id = $2 AND owner_id = $3
+       RETURNING id, email, role, status, created_at`,
+      [role, req.params.id, req.user.effectiveUserId]
+    );
+    if (!rows[0]) return res.status(404).json({ error: "Partner member not found." });
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error("[Auth] Update role error:", err.message);
+    return res.status(500).json({ error: "Failed to update partner role." });
+  }
+});
+
+// DELETE /api/auth/members/:id — Revoke partner access
+router.delete("/members/:id", authenticate, requireRole(["admin"]), async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      "DELETE FROM workspace_members WHERE id = $1 AND owner_id = $2",
+      [req.params.id, req.user.effectiveUserId]
+    );
+    if (!rowCount) return res.status(404).json({ error: "Partner member not found." });
+    return res.status(204).end();
+  } catch (err) {
+    console.error("[Auth] Revoke partner error:", err.message);
+    return res.status(500).json({ error: "Failed to revoke partner access." });
+  }
+});
+
+function sanitizeUser(u, role = "admin") {
   return {
     id: u.id,
     email: u.email,
     ownerName: u.owner_name,
     businessName: u.business_name,
     businessType: u.business_type,
+    role: role || "admin",
     createdAt: u.created_at,
   };
 }

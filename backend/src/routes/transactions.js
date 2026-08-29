@@ -1,7 +1,7 @@
 const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
-const { authenticate } = require("../middleware/auth");
+const { authenticate, requireRole } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
 
 const router = express.Router();
@@ -17,10 +17,11 @@ const txSchema = z.object({
 
 // GET /api/transactions
 router.get("/", async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       "SELECT * FROM transactions WHERE user_id = $1 ORDER BY date DESC, created_at DESC",
-      [req.user.id]
+      [ownerId]
     );
     return res.json(rows.map(fromRow));
   } catch (err) {
@@ -30,13 +31,14 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/transactions
-router.post("/", validate(txSchema), async (req, res) => {
+router.post("/", requireRole(["admin", "edit"]), validate(txSchema), async (req, res) => {
   const { type, amount, category, date, note } = req.body;
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       `INSERT INTO transactions (user_id, type, amount, category, date, note)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [req.user.id, type, amount, category, date, note]
+      [ownerId, type, amount, category, date, note]
     );
     return res.status(201).json(fromRow(rows[0]));
   } catch (err) {
@@ -46,11 +48,12 @@ router.post("/", validate(txSchema), async (req, res) => {
 });
 
 // DELETE /api/transactions/:id
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireRole(["admin", "edit"]), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rowCount } = await pool.query(
       "DELETE FROM transactions WHERE user_id = $1 AND id = $2",
-      [req.user.id, req.params.id]
+      [ownerId, req.params.id]
     );
     if (!rowCount) return res.status(404).json({ error: "Transaction not found." });
     return res.status(204).end();

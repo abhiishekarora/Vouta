@@ -1,7 +1,7 @@
 const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
-const { authenticate } = require("../middleware/auth");
+const { authenticate, requireRole } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
 
 const router = express.Router();
@@ -15,12 +15,13 @@ const goalSchema = z.object({
   note: z.string().max(1000).trim().default(""),
 });
 
-// GET /api/goals
+// GET /api/goals — viewable by view, edit, admin
 router.get("/", async (req, res) => {
   try {
+    const ownerId = req.user.effectiveUserId || req.user.id;
     const { rows } = await pool.query(
       "SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at DESC",
-      [req.user.id]
+      [ownerId]
     );
     return res.json(rows.map(fromRow));
   } catch (err) {
@@ -29,14 +30,15 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/goals
-router.post("/", validate(goalSchema), async (req, res) => {
+// POST /api/goals — requires edit or admin
+router.post("/", requireRole(["admin", "edit"]), validate(goalSchema), async (req, res) => {
   const { title, targetAmount, currentAmount, deadline, note } = req.body;
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       `INSERT INTO goals (user_id, title, target_amount, current_amount, deadline, note)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [req.user.id, title, targetAmount, currentAmount, deadline || null, note]
+      [ownerId, title, targetAmount, currentAmount, deadline || null, note]
     );
     return res.status(201).json(fromRow(rows[0]));
   } catch (err) {
@@ -45,9 +47,9 @@ router.post("/", validate(goalSchema), async (req, res) => {
   }
 });
 
-// PATCH /api/goals/:id — allows partial updates (e.g. add progress)
-router.patch("/:id", async (req, res) => {
-  const allowed = ["title", "target_amount", "current_amount", "deadline", "note"];
+// PATCH /api/goals/:id — requires edit or admin
+router.patch("/:id", requireRole(["admin", "edit"]), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   const updates = {};
   const body = req.body;
 
@@ -62,7 +64,7 @@ router.patch("/:id", async (req, res) => {
   }
 
   const sets = Object.keys(updates).map((k, i) => `${k} = $${i + 1}`).join(", ");
-  const vals = [...Object.values(updates), req.user.id, req.params.id];
+  const vals = [...Object.values(updates), ownerId, req.params.id];
 
   try {
     const { rows } = await pool.query(
@@ -77,12 +79,13 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/goals/:id
-router.delete("/:id", async (req, res) => {
+// DELETE /api/goals/:id — requires edit or admin
+router.delete("/:id", requireRole(["admin", "edit"]), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rowCount } = await pool.query(
       "DELETE FROM goals WHERE user_id = $1 AND id = $2",
-      [req.user.id, req.params.id]
+      [ownerId, req.params.id]
     );
     if (!rowCount) return res.status(404).json({ error: "Goal not found." });
     return res.status(204).end();

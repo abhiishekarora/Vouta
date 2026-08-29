@@ -1,23 +1,20 @@
 import React, { useState } from "react";
-import { Plus, Trash2, ChevronRight, Archive } from "lucide-react";
+import { Plus, Trash2, ChevronRight, Archive, Eye } from "lucide-react";
 import { Modal, EmptyState } from "./Modal";
-import { PROJECT_STATUSES, todayISO, PRIORITY_COLORS } from "../utils/helpers";
+import { PROJECT_STATUSES } from "../utils/helpers";
 import * as api from "../utils/api";
-
-const STATUS_COLORS = {
-  "Not Started": "var(--ink-soft)", Active: "var(--teal)",
-  Blocked: "var(--brick)", Completed: "var(--brass)",
-};
 
 const KANBAN_COLS = ["To Do", "In Progress", "Done"];
 
-export function ProjectsView({ data, refetch }) {
+export function ProjectsView({ data, refetch, userRole = "admin" }) {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [projectForm, setProjectForm] = useState({ name: "", label: "Internal", startDate: "", status: "Not Started", description: "" });
   const [taskForm, setTaskForm] = useState({ title: "", assignedTo: "", priority: "medium" });
+
+  const canEdit = userRole !== "view";
 
   const selectedProject = data.projects.find((p) => p.id === selectedProjectId);
   const tasksForProject = data.projectTasks.filter((t) => t.projectId === selectedProjectId);
@@ -81,9 +78,15 @@ export function ProjectsView({ data, refetch }) {
           <h1 className="bc-page-title">Projects</h1>
           <p className="bc-page-sub">Client and internal projects with Kanban task boards.</p>
         </div>
-        <button className="bc-btn bc-btn-primary" onClick={() => setShowProjectModal(true)}>
-          <Plus size={15} /> New Project
-        </button>
+        {canEdit ? (
+          <button className="bc-btn bc-btn-primary" onClick={() => setShowProjectModal(true)}>
+            <Plus size={15} /> New Project
+          </button>
+        ) : (
+          <span className="bc-role-badge view" style={{ padding: "6px 12px", fontSize: 12 }}>
+            <Eye size={13} style={{ marginRight: 4, verticalAlign: "middle" }} /> Read-Only View
+          </span>
+        )}
       </div>
 
       {data.projects.length === 0 ? (
@@ -99,30 +102,30 @@ export function ProjectsView({ data, refetch }) {
                 key={p.id}
                 className={"bc-card bc-project-item" + (selectedProjectId === p.id ? " selected" : "")}
                 onClick={() => setSelectedProjectId(selectedProjectId === p.id ? null : p.id)}
-                style={{ cursor: "pointer", marginBottom: 10 }}
+                style={{ cursor: "pointer", marginBottom: 10, borderColor: selectedProjectId === p.id ? "#FFFFFF" : "#27272A" }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14 }}>{p.name}</p>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: "#FFFFFF" }}>{p.name}</p>
                     <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--ink-soft)" }}>{p.label}</p>
                   </div>
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                     <ChevronRight size={15} style={{ color: "var(--ink-soft)" }} />
-                    <button
-                      className="bc-icon-btn"
-                      onClick={(e) => { e.stopPropagation(); removeProject(p.id); }}
-                      aria-label="Delete project"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {canEdit && (
+                      <button
+                        className="bc-icon-btn"
+                        onClick={(e) => { e.stopPropagation(); removeProject(p.id); }}
+                        aria-label="Delete project"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div style={{ marginTop: 8 }}>
-                  <span style={{ fontSize: 11.5, fontWeight: 700, color: STATUS_COLORS[p.status] }}>
-                    ● {p.status}
-                  </span>
+                  <span className="bc-tag">● {p.status}</span>
                 </div>
-                {selectedProjectId === p.id && (
+                {selectedProjectId === p.id && canEdit && (
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 8 }}>
                     {PROJECT_STATUSES.filter((s) => s !== p.status).map((s) => (
                       <button
@@ -144,10 +147,12 @@ export function ProjectsView({ data, refetch }) {
           {selectedProject && (
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <h2 style={{ margin: 0, fontFamily: "Zilla Slab, serif", fontSize: 20 }}>{selectedProject.name}</h2>
-                <button className="bc-btn bc-btn-ghost bc-btn-sm" onClick={() => setShowTaskModal(true)}>
-                  <Plus size={13} /> Add Task
-                </button>
+                <h2 style={{ margin: 0, fontFamily: "Zilla Slab, serif", fontSize: 20, color: "#FFFFFF" }}>{selectedProject.name}</h2>
+                {canEdit && (
+                  <button className="bc-btn bc-btn-ghost bc-btn-sm" onClick={() => setShowTaskModal(true)}>
+                    <Plus size={13} /> Add Task
+                  </button>
+                )}
               </div>
               <div style={{ display: "flex", gap: 14 }}>
                 {KANBAN_COLS.map((col) => (
@@ -158,29 +163,33 @@ export function ProjectsView({ data, refetch }) {
                       return (
                         <div key={task.id} className="bc-kanban-card">
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, flex: 1 }}>{task.title}</p>
-                            <button
-                              className="bc-icon-btn"
-                              onClick={() => removeTask(task.id)}
-                              style={{ padding: 2 }}
-                              aria-label="Remove task"
-                            >
-                              <Trash2 size={12} />
-                            </button>
+                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#FFFFFF", flex: 1 }}>{task.title}</p>
+                            {canEdit && (
+                              <button
+                                className="bc-icon-btn"
+                                onClick={() => removeTask(task.id)}
+                                style={{ padding: 2 }}
+                                aria-label="Remove task"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
                           </div>
                           {assignee && (
                             <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "var(--ink-soft)" }}>
                               👤 {assignee.name}
                             </p>
                           )}
-                          <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-                            {KANBAN_COLS.filter((c) => c !== col).map((dest) => (
-                              <button key={dest} className="bc-btn bc-btn-ghost bc-btn-sm" style={{ fontSize: 10.5, padding: "2px 7px" }}
-                                onClick={() => moveTask(task.id, dest)}>
-                                → {dest}
-                              </button>
-                            ))}
-                          </div>
+                          {canEdit && (
+                            <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+                              {KANBAN_COLS.filter((c) => c !== col).map((dest) => (
+                                <button key={dest} className="bc-btn bc-btn-ghost bc-btn-sm" style={{ fontSize: 10.5, padding: "2px 7px" }}
+                                  onClick={() => moveTask(task.id, dest)}>
+                                  → {dest}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -197,7 +206,7 @@ export function ProjectsView({ data, refetch }) {
         </div>
       )}
 
-      {showProjectModal && (
+      {showProjectModal && canEdit && (
         <Modal title="New Project" onClose={() => setShowProjectModal(false)}>
           <div className="bc-field">
             <label className="bc-label">Project Name</label>
@@ -231,7 +240,7 @@ export function ProjectsView({ data, refetch }) {
         </Modal>
       )}
 
-      {showTaskModal && (
+      {showTaskModal && canEdit && (
         <Modal title="Add Task" onClose={() => setShowTaskModal(false)}>
           <div className="bc-field">
             <label className="bc-label">Task Title</label>

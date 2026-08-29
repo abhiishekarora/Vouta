@@ -1,7 +1,7 @@
 const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
-const { authenticate } = require("../middleware/auth");
+const { authenticate, requireRole } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
 
 const router = express.Router();
@@ -23,10 +23,11 @@ const statusSchema = z.object({
 
 // GET /api/invoices
 router.get("/", async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       "SELECT * FROM invoices WHERE user_id = $1 ORDER BY issue_date DESC, created_at DESC",
-      [req.user.id]
+      [ownerId]
     );
     return res.json(rows.map(fromRow));
   } catch (err) {
@@ -36,13 +37,14 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/invoices
-router.post("/", validate(invoiceSchema), async (req, res) => {
+router.post("/", requireRole(["admin", "edit"]), validate(invoiceSchema), async (req, res) => {
   const { invoiceNo, client, amount, issueDate, dueDate, status, note } = req.body;
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       `INSERT INTO invoices (user_id, invoice_no, client, amount, issue_date, due_date, status, note)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [req.user.id, invoiceNo, client, amount, issueDate, dueDate || null, status, note]
+      [ownerId, invoiceNo, client, amount, issueDate, dueDate || null, status, note]
     );
     return res.status(201).json(fromRow(rows[0]));
   } catch (err) {
@@ -52,11 +54,12 @@ router.post("/", validate(invoiceSchema), async (req, res) => {
 });
 
 // PATCH /api/invoices/:id/status
-router.patch("/:id/status", validate(statusSchema), async (req, res) => {
+router.patch("/:id/status", requireRole(["admin", "edit"]), validate(statusSchema), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       "UPDATE invoices SET status = $1 WHERE user_id = $2 AND id = $3 RETURNING *",
-      [req.body.status, req.user.id, req.params.id]
+      [req.body.status, ownerId, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Invoice not found." });
     return res.json(fromRow(rows[0]));
@@ -67,11 +70,12 @@ router.patch("/:id/status", validate(statusSchema), async (req, res) => {
 });
 
 // DELETE /api/invoices/:id
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireRole(["admin", "edit"]), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rowCount } = await pool.query(
       "DELETE FROM invoices WHERE user_id = $1 AND id = $2",
-      [req.user.id, req.params.id]
+      [ownerId, req.params.id]
     );
     if (!rowCount) return res.status(404).json({ error: "Invoice not found." });
     return res.status(204).end();

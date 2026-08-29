@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Trash2, Search, FileText, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Search, FileText, AlertTriangle, Eye } from "lucide-react";
 import { Modal, EmptyState } from "./Modal";
 import { todayISO } from "../utils/helpers";
 import * as api from "../utils/api";
@@ -10,7 +10,7 @@ const DOC_CATEGORIES = [
   "IP / Trademark", "Contracts", "Other"
 ];
 
-export function DocumentsView({ data, refetch }) {
+export function DocumentsView({ data, refetch, userRole = "admin" }) {
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
@@ -19,6 +19,8 @@ export function DocumentsView({ data, refetch }) {
     title: "", category: DOC_CATEGORIES[1], docNumber: "",
     issueDate: "", expiryDate: "", status: "Filed", notes: "", content: "",
   });
+
+  const canEdit = userRole !== "view";
 
   const addDoc = async () => {
     if (!form.title.trim()) return;
@@ -38,6 +40,7 @@ export function DocumentsView({ data, refetch }) {
   };
 
   const removeDoc = async (id) => {
+    if (!canEdit) return;
     await api.documents.remove(id);
     await refetch();
   };
@@ -64,14 +67,20 @@ export function DocumentsView({ data, refetch }) {
           <h1 className="bc-page-title">Compliance Vault</h1>
           <p className="bc-page-sub">Track business registrations, filings, and legal documents.</p>
         </div>
-        <button className="bc-btn bc-btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={15} /> Add Document
-        </button>
+        {canEdit ? (
+          <button className="bc-btn bc-btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={15} /> Add Document
+          </button>
+        ) : (
+          <span className="bc-role-badge view" style={{ padding: "6px 12px", fontSize: 12 }}>
+            <Eye size={13} style={{ marginRight: 4, verticalAlign: "middle" }} /> Read-Only View
+          </span>
+        )}
       </div>
 
       {expiringSoon.length > 0 && (
-        <div className="bc-card" style={{ borderColor: "var(--brass)", background: "var(--brass-light)", marginBottom: 16 }}>
-          <p style={{ margin: 0, color: "var(--brass-dark)", fontWeight: 700, fontSize: 14 }}>
+        <div className="bc-card" style={{ borderColor: "#3F3F46", background: "#18181B", marginBottom: 16 }}>
+          <p style={{ margin: 0, color: "#FFFFFF", fontWeight: 700, fontSize: 14 }}>
             <AlertTriangle size={15} style={{ verticalAlign: "middle", marginRight: 6 }} />
             {expiringSoon.length} document{expiringSoon.length > 1 ? "s" : ""} expiring within 60 days:
             {" "}{expiringSoon.map((d) => d.title).join(", ")}
@@ -106,18 +115,18 @@ export function DocumentsView({ data, refetch }) {
             ? Math.round((new Date(d.expiryDate) - new Date(today)) / 86400000)
             : null;
           return (
-            <div key={d.id} className="bc-card bc-doc-card">
+            <div key={d.id} className="bc-card bc-doc-card" style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <FileText size={18} style={{ color: "var(--sidebar)", marginTop: 2, flexShrink: 0 }} />
+                  <FileText size={18} style={{ color: "#FFFFFF", marginTop: 2, flexShrink: 0 }} />
                   <div>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14.5 }}>{d.title}</p>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14.5, color: "#FFFFFF" }}>{d.title}</p>
                     <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--ink-soft)" }}>
                       {d.category}{d.docNumber ? ` · ${d.docNumber}` : ""}
                       {d.issueDate ? ` · Issued ${d.issueDate}` : ""}
                     </p>
                     {d.expiryDate && (
-                      <p style={{ margin: "3px 0 0", fontSize: 12, fontWeight: 700, color: daysLeft !== null && daysLeft <= 30 ? "var(--brick)" : daysLeft !== null && daysLeft <= 60 ? "var(--brass)" : "var(--ink-soft)" }}>
+                      <p style={{ margin: "3px 0 0", fontSize: 12, fontWeight: 700, color: "#E4E4E7" }}>
                         {daysLeft !== null && daysLeft >= 0
                           ? `Expires in ${daysLeft} days (${d.expiryDate})`
                           : `Expired on ${d.expiryDate}`}
@@ -125,9 +134,11 @@ export function DocumentsView({ data, refetch }) {
                     )}
                   </div>
                 </div>
-                <button className="bc-icon-btn" onClick={() => removeDoc(d.id)} aria-label="Delete document">
-                  <Trash2 size={14} />
-                </button>
+                {canEdit && (
+                  <button className="bc-icon-btn" onClick={() => removeDoc(d.id)} aria-label="Delete document">
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
               {d.notes && <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "var(--ink-soft)" }}>{d.notes}</p>}
             </div>
@@ -135,7 +146,7 @@ export function DocumentsView({ data, refetch }) {
         })
       )}
 
-      {showModal && (
+      {showModal && canEdit && (
         <Modal title="Add Document" onClose={() => setShowModal(false)}>
           <div className="bc-field">
             <label className="bc-label">Document Title</label>

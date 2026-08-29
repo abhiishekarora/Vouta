@@ -1,7 +1,7 @@
 const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
-const { authenticate } = require("../middleware/auth");
+const { authenticate, requireRole } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
 
 const router = express.Router();
@@ -17,10 +17,11 @@ const memberSchema = z.object({
 
 // GET /api/team
 router.get("/", async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       "SELECT * FROM team_members WHERE user_id = $1 ORDER BY created_at DESC",
-      [req.user.id]
+      [ownerId]
     );
     return res.json(rows.map(fromRow));
   } catch (err) {
@@ -30,13 +31,14 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/team
-router.post("/", validate(memberSchema), async (req, res) => {
+router.post("/", requireRole(["admin", "edit"]), validate(memberSchema), async (req, res) => {
   const { name, role, email, department, capacity } = req.body;
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       `INSERT INTO team_members (user_id, name, role, email, department, capacity)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [req.user.id, name, role, email, department, capacity]
+      [ownerId, name, role, email, department, capacity]
     );
     return res.status(201).json(fromRow(rows[0]));
   } catch (err) {
@@ -45,13 +47,14 @@ router.post("/", validate(memberSchema), async (req, res) => {
   }
 });
 
-// PATCH /api/team/:id/leave — toggle on_leave status
-router.patch("/:id/leave", async (req, res) => {
+// PATCH /api/team/:id/leave
+router.patch("/:id/leave", requireRole(["admin", "edit"]), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       `UPDATE team_members SET on_leave = NOT on_leave
        WHERE user_id = $1 AND id = $2 RETURNING *`,
-      [req.user.id, req.params.id]
+      [ownerId, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Team member not found." });
     return res.json(fromRow(rows[0]));
@@ -62,11 +65,12 @@ router.patch("/:id/leave", async (req, res) => {
 });
 
 // DELETE /api/team/:id
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireRole(["admin", "edit"]), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rowCount } = await pool.query(
       "DELETE FROM team_members WHERE user_id = $1 AND id = $2",
-      [req.user.id, req.params.id]
+      [ownerId, req.params.id]
     );
     if (!rowCount) return res.status(404).json({ error: "Team member not found." });
     return res.status(204).end();

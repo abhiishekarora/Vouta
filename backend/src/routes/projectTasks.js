@@ -1,7 +1,7 @@
 const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
-const { authenticate } = require("../middleware/auth");
+const { authenticate, requireRole } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
 
 const router = express.Router();
@@ -18,11 +18,12 @@ const moveSchema = z.object({
   status: z.enum(["To Do", "In Progress", "Done"]),
 });
 
-// GET /api/project-tasks?projectId=xxx
+// GET /api/project-tasks
 router.get("/", async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     let query = "SELECT * FROM project_tasks WHERE user_id = $1";
-    const params = [req.user.id];
+    const params = [ownerId];
 
     if (req.query.projectId) {
       params.push(req.query.projectId);
@@ -39,14 +40,14 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/project-tasks
-router.post("/", validate(taskSchema), async (req, res) => {
+router.post("/", requireRole(["admin", "edit"]), validate(taskSchema), async (req, res) => {
   const { projectId, title, assignedTo, priority } = req.body;
+  const ownerId = req.user.effectiveUserId || req.user.id;
 
-  // Verify project belongs to this user
   try {
     const proj = await pool.query(
       "SELECT id FROM projects WHERE user_id = $1 AND id = $2",
-      [req.user.id, projectId]
+      [ownerId, projectId]
     );
     if (!proj.rows[0]) {
       return res.status(404).json({ error: "Project not found or access denied." });
@@ -55,7 +56,7 @@ router.post("/", validate(taskSchema), async (req, res) => {
     const { rows } = await pool.query(
       `INSERT INTO project_tasks (user_id, project_id, assigned_to, title, priority)
        VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [req.user.id, projectId, assignedTo || null, title, priority]
+      [ownerId, projectId, assignedTo || null, title, priority]
     );
     return res.status(201).json(fromRow(rows[0]));
   } catch (err) {
@@ -64,13 +65,14 @@ router.post("/", validate(taskSchema), async (req, res) => {
   }
 });
 
-// PATCH /api/project-tasks/:id/move — move to a new Kanban status
-router.patch("/:id/move", validate(moveSchema), async (req, res) => {
+// PATCH /api/project-tasks/:id/move
+router.patch("/:id/move", requireRole(["admin", "edit"]), validate(moveSchema), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       `UPDATE project_tasks SET status = $1
        WHERE user_id = $2 AND id = $3 RETURNING *`,
-      [req.body.status, req.user.id, req.params.id]
+      [req.body.status, ownerId, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Task not found." });
     return res.json(fromRow(rows[0]));
@@ -81,11 +83,12 @@ router.patch("/:id/move", validate(moveSchema), async (req, res) => {
 });
 
 // DELETE /api/project-tasks/:id
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireRole(["admin", "edit"]), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rowCount } = await pool.query(
       "DELETE FROM project_tasks WHERE user_id = $1 AND id = $2",
-      [req.user.id, req.params.id]
+      [ownerId, req.params.id]
     );
     if (!rowCount) return res.status(404).json({ error: "Task not found." });
     return res.status(204).end();

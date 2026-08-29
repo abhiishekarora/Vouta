@@ -1,7 +1,7 @@
 const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
-const { authenticate } = require("../middleware/auth");
+const { authenticate, requireRole } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
 
 const router = express.Router();
@@ -15,10 +15,11 @@ const todoSchema = z.object({
 
 // GET /api/todos
 router.get("/", async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       "SELECT * FROM todos WHERE user_id = $1 ORDER BY done ASC, created_at DESC",
-      [req.user.id]
+      [ownerId]
     );
     return res.json(rows.map(fromRow));
   } catch (err) {
@@ -28,13 +29,14 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/todos
-router.post("/", validate(todoSchema), async (req, res) => {
+router.post("/", requireRole(["admin", "edit"]), validate(todoSchema), async (req, res) => {
   const { text, priority, dueDate } = req.body;
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       `INSERT INTO todos (user_id, text, priority, due_date)
        VALUES ($1,$2,$3,$4) RETURNING *`,
-      [req.user.id, text, priority, dueDate || null]
+      [ownerId, text, priority, dueDate || null]
     );
     return res.status(201).json(fromRow(rows[0]));
   } catch (err) {
@@ -43,12 +45,13 @@ router.post("/", validate(todoSchema), async (req, res) => {
   }
 });
 
-// PATCH /api/todos/:id/toggle  — toggle done state
-router.patch("/:id/toggle", async (req, res) => {
+// PATCH /api/todos/:id/toggle
+router.patch("/:id/toggle", requireRole(["admin", "edit"]), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       `UPDATE todos SET done = NOT done WHERE user_id = $1 AND id = $2 RETURNING *`,
-      [req.user.id, req.params.id]
+      [ownerId, req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: "Task not found." });
     return res.json(fromRow(rows[0]));
@@ -59,11 +62,12 @@ router.patch("/:id/toggle", async (req, res) => {
 });
 
 // DELETE /api/todos/:id
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireRole(["admin", "edit"]), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rowCount } = await pool.query(
       "DELETE FROM todos WHERE user_id = $1 AND id = $2",
-      [req.user.id, req.params.id]
+      [ownerId, req.params.id]
     );
     if (!rowCount) return res.status(404).json({ error: "Task not found." });
     return res.status(204).end();

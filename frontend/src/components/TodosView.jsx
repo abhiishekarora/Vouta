@@ -1,13 +1,15 @@
 import React, { useState } from "react";
-import { Plus, Trash2, Check } from "lucide-react";
+import { Plus, Trash2, Check, Eye } from "lucide-react";
 import { Modal, EmptyState } from "./Modal";
 import { todayISO, PRIORITY_COLORS } from "../utils/helpers";
 import * as api from "../utils/api";
 
-export function TodosView({ data, refetch }) {
+export function TodosView({ data, refetch, userRole = "admin" }) {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ text: "", priority: "medium", dueDate: "" });
+
+  const canEdit = userRole !== "view";
 
   const addTodo = async () => {
     if (!form.text.trim()) return;
@@ -23,11 +25,13 @@ export function TodosView({ data, refetch }) {
   };
 
   const toggleTodo = async (id) => {
+    if (!canEdit) return;
     await api.todos.toggle(id);
     await refetch();
   };
 
   const removeTodo = async (id) => {
+    if (!canEdit) return;
     await api.todos.remove(id);
     await refetch();
   };
@@ -42,9 +46,15 @@ export function TodosView({ data, refetch }) {
           <h1 className="bc-page-title">Action Items</h1>
           <p className="bc-page-sub">{pending.length} pending · {completed.length} completed</p>
         </div>
-        <button className="bc-btn bc-btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={15} /> New Task
-        </button>
+        {canEdit ? (
+          <button className="bc-btn bc-btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={15} /> New Task
+          </button>
+        ) : (
+          <span className="bc-role-badge view" style={{ padding: "6px 12px", fontSize: 12 }}>
+            <Eye size={13} style={{ marginRight: 4, verticalAlign: "middle" }} /> Read-Only View
+          </span>
+        )}
       </div>
 
       {data.todos.length === 0 ? (
@@ -55,23 +65,23 @@ export function TodosView({ data, refetch }) {
         <>
           {pending.length > 0 && (
             <div className="bc-card" style={{ marginBottom: 16 }}>
-              {pending.map((t) => <TodoRow key={t.id} todo={t} onToggle={toggleTodo} onDelete={removeTodo} />)}
+              {pending.map((t) => <TodoRow key={t.id} todo={t} onToggle={toggleTodo} onDelete={removeTodo} canEdit={canEdit} />)}
             </div>
           )}
           {completed.length > 0 && (
             <>
-              <p style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: "0.08em", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: 6 }}>
+              <p style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.08em", color: "var(--ink-soft)", textTransform: "uppercase", marginBottom: 6 }}>
                 Completed
               </p>
               <div className="bc-card">
-                {completed.map((t) => <TodoRow key={t.id} todo={t} onToggle={toggleTodo} onDelete={removeTodo} />)}
+                {completed.map((t) => <TodoRow key={t.id} todo={t} onToggle={toggleTodo} onDelete={removeTodo} canEdit={canEdit} />)}
               </div>
             </>
           )}
         </>
       )}
 
-      {showModal && (
+      {showModal && canEdit && (
         <Modal title="Add Action Item" onClose={() => setShowModal(false)}>
           <div className="bc-field">
             <label className="bc-label">Task Description</label>
@@ -100,26 +110,28 @@ export function TodosView({ data, refetch }) {
   );
 }
 
-function TodoRow({ todo, onToggle, onDelete }) {
+function TodoRow({ todo, onToggle, onDelete, canEdit }) {
   return (
     <div className={"bc-todo-row" + (todo.done ? " done" : "")}>
-      <button className={"bc-check" + (todo.done ? " checked" : "")} onClick={() => onToggle(todo.id)} aria-label="Toggle task">
+      <button className={"bc-check" + (todo.done ? " checked" : "")} onClick={() => onToggle(todo.id)} disabled={!canEdit} aria-label="Toggle task">
         {todo.done && <Check size={11} />}
       </button>
       <div style={{ flex: 1 }}>
-        <span style={{ fontWeight: 500, textDecoration: todo.done ? "line-through" : "none", color: todo.done ? "var(--ink-soft)" : "inherit" }}>
+        <span style={{ fontWeight: 500, textDecoration: todo.done ? "line-through" : "none", color: todo.done ? "var(--ink-soft)" : "#FFFFFF" }}>
           {todo.text}
         </span>
         <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: PRIORITY_COLORS[todo.priority] || "var(--ink-soft)" }}>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: "#E4E4E7" }}>
             ● {todo.priority?.toUpperCase()}
           </span>
           {todo.dueDate && <span style={{ fontSize: 11.5, color: "var(--ink-soft)" }}>Due {todo.dueDate}</span>}
         </div>
       </div>
-      <button className="bc-icon-btn" onClick={() => onDelete(todo.id)} aria-label="Delete task">
-        <Trash2 size={14} />
-      </button>
+      {canEdit && (
+        <button className="bc-icon-btn" onClick={() => onDelete(todo.id)} aria-label="Delete task">
+          <Trash2 size={14} />
+        </button>
+      )}
     </div>
   );
 }

@@ -24,13 +24,18 @@ const pool = new Pool({
 async function migrate() {
   const client = await pool.connect();
   try {
-    console.log("[Migrate] Running schema migration via unpooled connection…");
-    const sqlPath = path.join(__dirname, "../migrations/001_init.sql");
-    const sql = fs.readFileSync(sqlPath, "utf8");
-    await client.query(sql);
-    console.log("[Migrate] ✓ Schema applied successfully.");
+    console.log("[Migrate] Running schema migrations via unpooled connection…");
+    const migrationsDir = path.join(__dirname, "../migrations");
+    const files = fs.readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort();
+    
+    for (const file of files) {
+      console.log(`[Migrate] Applying ${file}…`);
+      const sql = fs.readFileSync(path.join(migrationsDir, file), "utf8");
+      await client.query(sql);
+    }
+    console.log("[Migrate] ✓ All migrations applied successfully.");
   } catch (err) {
-    console.error("[Migrate] ✗ Failed:", err.message);
+    console.error("[Migrate] ✗ Migration failed:", err.message);
     process.exit(1);
   } finally {
     client.release();

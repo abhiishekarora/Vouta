@@ -1,7 +1,7 @@
 const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
-const { authenticate } = require("../middleware/auth");
+const { authenticate, requireRole } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
 
 const router = express.Router();
@@ -20,10 +20,11 @@ const docSchema = z.object({
 
 // GET /api/documents
 router.get("/", async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   const { search, category } = req.query;
   try {
     let query = "SELECT * FROM documents WHERE user_id = $1";
-    const params = [req.user.id];
+    const params = [ownerId];
 
     if (category && category !== "all") {
       params.push(category);
@@ -44,13 +45,14 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/documents
-router.post("/", validate(docSchema), async (req, res) => {
+router.post("/", requireRole(["admin", "edit"]), validate(docSchema), async (req, res) => {
   const { title, category, docNumber, issueDate, expiryDate, status, notes, content } = req.body;
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rows } = await pool.query(
       `INSERT INTO documents (user_id, title, category, doc_number, issue_date, expiry_date, status, notes, content)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [req.user.id, title, category, docNumber, issueDate || null, expiryDate || null, status, notes, content]
+      [ownerId, title, category, docNumber, issueDate || null, expiryDate || null, status, notes, content]
     );
     return res.status(201).json(fromRow(rows[0]));
   } catch (err) {
@@ -60,11 +62,12 @@ router.post("/", validate(docSchema), async (req, res) => {
 });
 
 // DELETE /api/documents/:id
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireRole(["admin", "edit"]), async (req, res) => {
+  const ownerId = req.user.effectiveUserId || req.user.id;
   try {
     const { rowCount } = await pool.query(
       "DELETE FROM documents WHERE user_id = $1 AND id = $2",
-      [req.user.id, req.params.id]
+      [ownerId, req.params.id]
     );
     if (!rowCount) return res.status(404).json({ error: "Document not found." });
     return res.status(204).end();

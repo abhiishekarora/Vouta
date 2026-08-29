@@ -1,22 +1,19 @@
 import React, { useState } from "react";
-import { Plus, Trash2, UserCheck, UserX } from "lucide-react";
+import { Plus, Trash2, UserCheck, UserX, Eye } from "lucide-react";
 import { Modal, EmptyState } from "./Modal";
 import { DEPARTMENTS } from "../utils/helpers";
 import * as api from "../utils/api";
-
-const DEPT_COLORS = {
-  Engineering: "#3B82F6", Sales: "#F59E0B", Marketing: "#8B5CF6",
-  Design: "#EC4899", Finance: "#10B981", HR: "#6366F1", Operations: "#F97316", Other: "#6B7280",
-};
 
 function initials(name) {
   return name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
 }
 
-export function TeamView({ data, refetch }) {
+export function TeamView({ data, refetch, userRole = "admin" }) {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", role: "", email: "", department: DEPARTMENTS[0], capacity: "40" });
+
+  const canEdit = userRole !== "view";
 
   const addMember = async () => {
     if (!form.name.trim() || !form.email.trim()) return;
@@ -32,11 +29,13 @@ export function TeamView({ data, refetch }) {
   };
 
   const toggleLeave = async (id) => {
+    if (!canEdit) return;
     await api.team.toggleLeave(id);
     await refetch();
   };
 
   const removeMember = async (id) => {
+    if (!canEdit) return;
     await api.team.remove(id);
     await refetch();
   };
@@ -48,12 +47,18 @@ export function TeamView({ data, refetch }) {
     <div>
       <div className="bc-topbar">
         <div>
-          <h1 className="bc-page-title">Team</h1>
+          <h1 className="bc-page-title">Team Roster</h1>
           <p className="bc-page-sub">{active.length} active · {onLeave.length} on leave</p>
         </div>
-        <button className="bc-btn bc-btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={15} /> Add Member
-        </button>
+        {canEdit ? (
+          <button className="bc-btn bc-btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={15} /> Add Member
+          </button>
+        ) : (
+          <span className="bc-role-badge view" style={{ padding: "6px 12px", fontSize: 12 }}>
+            <Eye size={13} style={{ marginRight: 4, verticalAlign: "middle" }} /> Read-Only View
+          </span>
+        )}
       </div>
 
       {data.team.length === 0 ? (
@@ -66,43 +71,45 @@ export function TeamView({ data, refetch }) {
             <div key={m.id} className={"bc-card bc-member-card" + (m.onLeave ? " on-leave" : "")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  <div className="bc-avatar" style={{ background: DEPT_COLORS[m.department] || "#6B7280" }}>
+                  <div className="bc-avatar">
                     {initials(m.name)}
                   </div>
                   <div>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14.5 }}>{m.name}</p>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14.5, color: "#FFFFFF" }}>{m.name}</p>
                     <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--ink-soft)" }}>{m.role || "—"}</p>
                   </div>
                 </div>
-                <button className="bc-icon-btn" onClick={() => removeMember(m.id)} aria-label="Remove member">
-                  <Trash2 size={14} />
-                </button>
+                {canEdit && (
+                  <button className="bc-icon-btn" onClick={() => removeMember(m.id)} aria-label="Remove member">
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
 
               <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                <span className="bc-tag" style={{ background: DEPT_COLORS[m.department] + "22", color: DEPT_COLORS[m.department] }}>
-                  {m.department}
-                </span>
+                <span className="bc-tag">{m.department}</span>
                 <span className="bc-tag">{m.capacity}h/wk capacity</span>
               </div>
 
               <p style={{ margin: "10px 0 0", fontSize: 12, color: "var(--ink-soft)" }}>{m.email}</p>
 
-              <div style={{ marginTop: 12 }}>
-                <button
-                  className={"bc-btn bc-btn-sm " + (m.onLeave ? "bc-btn-primary" : "bc-btn-ghost")}
-                  style={{ width: "100%", justifyContent: "center" }}
-                  onClick={() => toggleLeave(m.id)}
-                >
-                  {m.onLeave ? (<><UserCheck size={13} /> Mark Active</>) : (<><UserX size={13} /> Set On Leave</>)}
-                </button>
-              </div>
+              {canEdit && (
+                <div style={{ marginTop: 12 }}>
+                  <button
+                    className={"bc-btn bc-btn-sm " + (m.onLeave ? "bc-btn-primary" : "bc-btn-ghost")}
+                    style={{ width: "100%", justifyContent: "center" }}
+                    onClick={() => toggleLeave(m.id)}
+                  >
+                    {m.onLeave ? (<><UserCheck size={13} /> Mark Active</>) : (<><UserX size={13} /> Set On Leave</>)}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {showModal && (
+      {showModal && canEdit && (
         <Modal title="Add Team Member" onClose={() => setShowModal(false)}>
           <div className="bc-row-2">
             <div className="bc-field">

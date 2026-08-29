@@ -22,7 +22,7 @@ export default function App() {
   if (authLoading) {
     return (
       <div className="bc-auth-page">
-        <p style={{ fontFamily: "Zilla Slab, serif", fontSize: 20, fontWeight: 600, color: "var(--ink-soft)" }}>
+        <p style={{ fontFamily: "Zilla Slab, serif", fontSize: 20, fontWeight: 600, color: "#A1A1AA" }}>
           Loading Console…
         </p>
       </div>
@@ -44,7 +44,8 @@ export default function App() {
     setCurrentUser(null);
   };
 
-  const sharedProps = { data, refetch, updateResource };
+  const userRole = (currentUser?.role || "admin").toLowerCase();
+  const sharedProps = { data, refetch, updateResource, userRole };
 
   return (
     <div className="bc-root">
@@ -57,13 +58,13 @@ export default function App() {
         />
         <main className="bc-main">
           {dataLoading && (
-            <div style={{ padding: "60px 0", textAlign: "center", color: "var(--ink-soft)" }}>
+            <div style={{ padding: "60px 0", textAlign: "center", color: "#A1A1AA" }}>
               Loading data…
             </div>
           )}
           {error && !dataLoading && (
-            <div className="bc-card" style={{ borderColor: "var(--brick)", marginBottom: 20 }}>
-              <p style={{ color: "var(--brick)", fontWeight: 600, margin: 0 }}>
+            <div className="bc-card" style={{ borderColor: "#3F3F46", marginBottom: 20 }}>
+              <p style={{ color: "#FAFAFA", fontWeight: 600, margin: 0 }}>
                 Could not reach server: {error}
               </p>
             </div>

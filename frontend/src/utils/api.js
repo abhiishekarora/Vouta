@@ -67,6 +67,10 @@ export const auth = {
   login:    (data)  => post("/auth/login", data),
   me:       ()      => get("/auth/me"),
   profile:  (data)  => patch("/auth/profile", data),
+  getMembers: ()    => get("/auth/members"),
+  inviteMember: (data) => post("/auth/invite", data),
+  updateRole: (id, role) => patch(`/auth/members/${id}/role`, { role }),
+  removeMember: (id) => del(`/auth/members/${id}`),
 };
 
 // ─── Goals ────────────────────────────────────────────────────────

@@ -1,15 +1,17 @@
 import React, { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Eye } from "lucide-react";
 import { Modal, EmptyState } from "./Modal";
 import { INR } from "../utils/helpers";
 import * as api from "../utils/api";
 
-export function GoalsView({ data, refetch }) {
+export function GoalsView({ data, refetch, userRole = "admin" }) {
   const [showModal, setShowModal] = useState(false);
   const [contributingId, setContributingId] = useState(null);
   const [contribAmount, setContribAmount] = useState("");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ title: "", targetAmount: "", currentAmount: "", deadline: "", note: "" });
+
+  const canEdit = userRole !== "view";
 
   const addGoal = async () => {
     if (!form.title.trim() || !form.targetAmount) return;
@@ -53,9 +55,15 @@ export function GoalsView({ data, refetch }) {
           <h1 className="bc-page-title">Goals</h1>
           <p className="bc-page-sub">Financial targets, runway goals, and revenue milestones.</p>
         </div>
-        <button className="bc-btn bc-btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={15} /> New Goal
-        </button>
+        {canEdit ? (
+          <button className="bc-btn bc-btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={15} /> New Goal
+          </button>
+        ) : (
+          <span className="bc-role-badge view" style={{ padding: "6px 12px", fontSize: 12 }}>
+            <Eye size={13} style={{ marginRight: 4, verticalAlign: "middle" }} /> Read-Only View
+          </span>
+        )}
       </div>
 
       {data.goals.length === 0 ? (
@@ -64,9 +72,11 @@ export function GoalsView({ data, refetch }) {
             title="Set your first goal"
             body="Track savings targets, funding milestones, or revenue targets here."
             action={
-              <button className="bc-btn bc-btn-primary" style={{ marginTop: 12 }} onClick={() => setShowModal(true)}>
-                <Plus size={15} /> Create Goal
-              </button>
+              canEdit ? (
+                <button className="bc-btn bc-btn-primary" style={{ marginTop: 12 }} onClick={() => setShowModal(true)}>
+                  <Plus size={15} /> Create Goal
+                </button>
+              ) : null
             }
           />
         </div>
@@ -83,9 +93,11 @@ export function GoalsView({ data, refetch }) {
                     {g.deadline ? ` · Target Date: ${g.deadline}` : ""}
                   </p>
                 </div>
-                <button className="bc-icon-btn" onClick={() => removeGoal(g.id)} aria-label="Delete goal">
-                  <Trash2 size={15} />
-                </button>
+                {canEdit && (
+                  <button className="bc-icon-btn" onClick={() => removeGoal(g.id)} aria-label="Delete goal">
+                    <Trash2 size={15} />
+                  </button>
+                )}
               </div>
               <div className="bc-progress-track">
                 <div className="bc-progress-fill" style={{ width: pct + "%" }} />
@@ -94,24 +106,26 @@ export function GoalsView({ data, refetch }) {
                 <span style={{ fontSize: 12.5, color: "var(--ink-soft)", fontFamily: "IBM Plex Mono, monospace", fontWeight: 600 }}>
                   {pct}% Completed
                 </span>
-                {contributingId === g.id ? (
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <input
-                      className="bc-input"
-                      style={{ width: 120, padding: "5px 8px" }}
-                      type="number"
-                      placeholder="Amount (₹)"
-                      value={contribAmount}
-                      onChange={(e) => setContribAmount(e.target.value)}
-                      autoFocus
-                    />
-                    <button className="bc-btn bc-btn-primary bc-btn-sm" onClick={() => contribute(g.id)}>Add</button>
-                    <button className="bc-btn bc-btn-ghost bc-btn-sm" onClick={() => { setContributingId(null); setContribAmount(""); }}>Cancel</button>
-                  </div>
-                ) : (
-                  <button className="bc-btn bc-btn-ghost bc-btn-sm" onClick={() => setContributingId(g.id)}>
-                    + Add Progress
-                  </button>
+                {canEdit && (
+                  contributingId === g.id ? (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <input
+                        className="bc-input"
+                        style={{ width: 120, padding: "5px 8px" }}
+                        type="number"
+                        placeholder="Amount (₹)"
+                        value={contribAmount}
+                        onChange={(e) => setContribAmount(e.target.value)}
+                        autoFocus
+                      />
+                      <button className="bc-btn bc-btn-primary bc-btn-sm" onClick={() => contribute(g.id)}>Add</button>
+                      <button className="bc-btn bc-btn-ghost bc-btn-sm" onClick={() => { setContributingId(null); setContribAmount(""); }}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button className="bc-btn bc-btn-ghost bc-btn-sm" onClick={() => setContributingId(g.id)}>
+                      + Add Progress
+                    </button>
+                  )
                 )}
               </div>
               {g.note && <p style={{ fontSize: 12.5, color: "var(--ink-soft)", marginTop: 10, marginBottom: 0 }}>{g.note}</p>}
@@ -120,7 +134,7 @@ export function GoalsView({ data, refetch }) {
         })
       )}
 
-      {showModal && (
+      {showModal && canEdit && (
         <Modal title="New Financial Goal" onClose={() => setShowModal(false)}>
           <div className="bc-field">
             <label className="bc-label">Goal Title</label>
