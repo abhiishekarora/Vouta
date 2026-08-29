@@ -117,11 +117,11 @@ function TodoRow({ todo, onToggle, onDelete, canEdit }) {
         {todo.done && <Check size={11} />}
       </button>
       <div style={{ flex: 1 }}>
-        <span style={{ fontWeight: 500, textDecoration: todo.done ? "line-through" : "none", color: todo.done ? "var(--ink-soft)" : "#FFFFFF" }}>
+        <span style={{ fontWeight: 500, textDecoration: todo.done ? "line-through" : "none", color: todo.done ? "var(--ink-soft)" : "var(--ink)" }}>
           {todo.text}
         </span>
         <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: "#E4E4E7" }}>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--purple-dark)" }}>
             ● {todo.priority?.toUpperCase()}
           </span>
           {todo.dueDate && <span style={{ fontSize: 11.5, color: "var(--ink-soft)" }}>Due {todo.dueDate}</span>}

@@ -59,9 +59,9 @@ export function InvoicesView({ data, refetch, userRole = "admin" }) {
       </div>
 
       {totalUnpaid > 0 && (
-        <div className="bc-card" style={{ background: "#18181B", borderColor: "#3F3F46", marginBottom: 16 }}>
-          <p style={{ margin: 0, color: "#FFFFFF", fontWeight: 700, fontSize: 14 }}>
-            <Clock size={15} style={{ verticalAlign: "middle", marginRight: 6 }} />
+        <div className="bc-card" style={{ background: "var(--amber-light)", borderColor: "var(--amber)", marginBottom: 16 }}>
+          <p style={{ margin: 0, color: "var(--ink)", fontWeight: 700, fontSize: 14 }}>
+            <Clock size={15} style={{ verticalAlign: "middle", marginRight: 6, color: "var(--amber)" }} />
             {INR(totalUnpaid)} outstanding in draft / sent invoices
           </p>
         </div>

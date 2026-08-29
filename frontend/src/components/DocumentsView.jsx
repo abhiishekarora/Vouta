@@ -79,8 +79,8 @@ export function DocumentsView({ data, refetch, userRole = "admin" }) {
       </div>
 
       {expiringSoon.length > 0 && (
-        <div className="bc-card" style={{ borderColor: "#3F3F46", background: "#18181B", marginBottom: 16 }}>
-          <p style={{ margin: 0, color: "#FFFFFF", fontWeight: 700, fontSize: 14 }}>
+        <div className="bc-card" style={{ borderColor: "#FCA5A5", background: "#FEF2F2", marginBottom: 16 }}>
+          <p style={{ margin: 0, color: "#EF4444", fontWeight: 700, fontSize: 14 }}>
             <AlertTriangle size={15} style={{ verticalAlign: "middle", marginRight: 6 }} />
             {expiringSoon.length} document{expiringSoon.length > 1 ? "s" : ""} expiring within 60 days:
             {" "}{expiringSoon.map((d) => d.title).join(", ")}
@@ -118,15 +118,15 @@ export function DocumentsView({ data, refetch, userRole = "admin" }) {
             <div key={d.id} className="bc-card bc-doc-card" style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <FileText size={18} style={{ color: "#FFFFFF", marginTop: 2, flexShrink: 0 }} />
+                  <FileText size={18} style={{ color: "var(--purple)", marginTop: 2, flexShrink: 0 }} />
                   <div>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14.5, color: "#FFFFFF" }}>{d.title}</p>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14.5, color: "var(--ink)" }}>{d.title}</p>
                     <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--ink-soft)" }}>
                       {d.category}{d.docNumber ? ` · ${d.docNumber}` : ""}
                       {d.issueDate ? ` · Issued ${d.issueDate}` : ""}
                     </p>
                     {d.expiryDate && (
-                      <p style={{ margin: "3px 0 0", fontSize: 12, fontWeight: 700, color: "#E4E4E7" }}>
+                      <p style={{ margin: "3px 0 0", fontSize: 12, fontWeight: 700, color: "var(--ink-soft)" }}>
                         {daysLeft !== null && daysLeft >= 0
                           ? `Expires in ${daysLeft} days (${d.expiryDate})`
                           : `Expired on ${d.expiryDate}`}
