@@ -1,0 +1,22 @@
+# ─── Dependencies ─────────────────────────────────────────────────
+node_modules/
+
+# ─── Build outputs ────────────────────────────────────────────────
+frontend/dist/
+frontend/.vite/
+
+# ─── Environment files (NEVER commit secrets) ─────────────────────
+backend/.env
+frontend/.env
+frontend/.env.local
+frontend/.env.production.local
+
+# ─── OS / Editor ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+*.local
+
+# ─── Logs ─────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
