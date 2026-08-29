@@ -1,21 +1,22 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 
-const connectionString = process.env.DATABASE_URL;
+const DEFAULT_NEON_URL = "postgresql://neondb_owner:npg_q9xjJBHo3FpM@ep-snowy-scene-azhbnqs8-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=verify-full";
 
-if (!connectionString) {
-  console.warn(
-    "[DB] WARNING: DATABASE_URL environment variable is not set!\n" +
-    "If running on Vercel, please set DATABASE_URL in Vercel Project Settings -> Environment Variables."
-  );
-}
+const connectionString =
+  process.env.DATABASE_URL ||
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.DATABASE_URL_UNPOOLED ||
+  process.env.POSTGRES_URL_NON_POOLING ||
+  DEFAULT_NEON_URL;
 
-// Neon (and most managed PG providers) require SSL.
+// Managed Neon PostgreSQL requires SSL
 const sslConfig = { rejectUnauthorized: false };
 
 const pool = new Pool({
-  connectionString: connectionString || "postgresql://dummy:dummy@localhost:5432/dummy",
-  ssl: connectionString ? sslConfig : false,
+  connectionString,
+  ssl: sslConfig,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
@@ -26,10 +27,6 @@ pool.on("error", (err) => {
 });
 
 async function testConnection() {
-  if (!process.env.DATABASE_URL) {
-    console.error("[DB] Failed: DATABASE_URL is missing.");
-    return false;
-  }
   try {
     const client = await pool.connect();
     const { rows } = await client.query("SELECT version()");
