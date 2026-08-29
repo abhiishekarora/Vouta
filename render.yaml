@@ -1,0 +1,38 @@
+services:
+  # ─── Backend Service ──────────────────────────────────────────────
+  - type: web
+    name: vouta-backend
+    env: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node src/server.js
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_q9xjJBHo3FpM@ep-snowy-scene-azhbnqs8-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=verify-full
+      - key: DATABASE_URL_UNPOOLED
+        value: postgresql://neondb_owner:npg_q9xjJBHo3FpM@ep-snowy-scene-azhbnqs8.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=verify-full
+      - key: JWT_SECRET
+        value: 00a659ca0fda44eb79130032f81bf750850a0a7b347175b9834bbd1afe75a327d68f60ee9ccf5ad42e4a040c103606dbeb3e6e3f360de26c91b9429d29484ee6
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        value: https://vouta-frontend.onrender.com,http://localhost:3000
+
+  # ─── Frontend Static Site ─────────────────────────────────────────
+  - type: web
+    name: vouta-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://vouta-backend.onrender.com
