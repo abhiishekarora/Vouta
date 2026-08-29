@@ -13,15 +13,19 @@ const EMPTY = {
 };
 
 /**
- * Fetches all console data from the API and provides
- * individual refresh functions per resource.
+ * Fetches all console data from the API when enabled (user authenticated).
  */
-export function useConsoleData() {
+export function useConsoleData(enabled = true) {
   const [data, setData] = useState(EMPTY);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const fetchAll = useCallback(async () => {
+    if (!enabled || !api.token.get()) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
       const [goals, transactions, invoices, todos, team, projects, projectTasks, documents] =
         await Promise.all([
@@ -31,22 +35,26 @@ export function useConsoleData() {
           api.todos.list(),
           api.team.list(),
           api.projects.list(),
-          api.projectTasks.list(""),   // fetch all tasks for this user
+          api.projectTasks.list(""),
           api.documents.list(),
         ]);
 
       setData({ goals, transactions, invoices, todos, team, projects, projectTasks, documents });
       setError(null);
     } catch (err) {
-      setError(err.message || "Failed to load data.");
+      if (err.status !== 401) {
+        setError(err.message || "Failed to load data.");
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+    if (enabled) {
+      fetchAll();
+    }
+  }, [fetchAll, enabled]);
 
   // Optimistic local update helpers
   const updateResource = (key, updater) =>

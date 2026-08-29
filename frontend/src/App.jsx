@@ -16,7 +16,7 @@ import { SettingsView } from "./components/SettingsView";
 
 export default function App() {
   const { currentUser, setCurrentUser, authLoading } = useAuthState();
-  const { data, loading: dataLoading, error, refetch, updateResource } = useConsoleData();
+  const { data, loading: dataLoading, error, refetch, updateResource } = useConsoleData(!!currentUser);
   const [activeTab, setActiveTab] = useState("dashboard");
 
   if (authLoading) {

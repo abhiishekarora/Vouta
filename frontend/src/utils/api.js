@@ -37,8 +37,9 @@ async function request(method, path, body) {
   // Auto-logout on 401
   if (res.status === 401) {
     token.clear();
-    window.location.reload();
-    return;
+    const err = new Error("Session expired. Please sign in.");
+    err.status = 401;
+    throw err;
   }
 
   if (res.status === 204) return null; // No content (DELETE success)
