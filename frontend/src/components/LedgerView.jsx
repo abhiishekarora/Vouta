@@ -1,8 +1,11 @@
-import React, { useState } from "react";
-import { Plus, Trash2, TrendingUp, TrendingDown, Eye } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Plus, Trash2, TrendingUp, TrendingDown, Eye, PieChart as PieIcon } from "lucide-react";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 import { Modal, StatCard, EmptyState } from "./Modal";
 import { INR, todayISO, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "../utils/helpers";
 import * as api from "../utils/api";
+
+const PIE_COLORS = ["#8B5CF6", "#3B82F6", "#10B981", "#F59E0B", "#6366F1", "#EC4899", "#14B8A6"];
 
 export function LedgerView({ data, refetch, userRole = "admin" }) {
   const [showModal, setShowModal] = useState(false);
@@ -39,6 +42,19 @@ export function LedgerView({ data, refetch, userRole = "admin" }) {
   const totalIncome  = data.transactions.filter((t) => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
   const totalExpense = data.transactions.filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
 
+  // Category Distribution Pie Chart
+  const categoryPieData = useMemo(() => {
+    const list = filter === "all" ? data.transactions : data.transactions.filter((t) => t.type === filter);
+    const map = {};
+    list.forEach((t) => {
+      map[t.category] = (map[t.category] || 0) + Number(t.amount);
+    });
+    return Object.keys(map).map((cat) => ({
+      name: cat,
+      value: map[cat],
+    })).sort((a, b) => b.value - a.value);
+  }, [data.transactions, filter]);
+
   return (
     <div>
       <div className="bc-topbar">
@@ -58,9 +74,39 @@ export function LedgerView({ data, refetch, userRole = "admin" }) {
       </div>
 
       <div className="bc-grid bc-grid-2" style={{ marginBottom: 20 }}>
-        <StatCard label="Total Income Recorded" value={INR(totalIncome)} icon={<TrendingUp size={16} />} tint="#18181B" textColor="#FFFFFF" />
-        <StatCard label="Total Expenses Recorded" value={INR(totalExpense)} icon={<TrendingDown size={16} />} tint="#18181B" textColor="#E4E4E7" />
+        <StatCard label="Total Income Recorded" value={INR(totalIncome)} icon={<TrendingUp size={18} />} tint="#ECFDF5" textColor="#059669" />
+        <StatCard label="Total Expenses Recorded" value={INR(totalExpense)} icon={<TrendingDown size={18} />} tint="#F3E8FF" textColor="#7C3AED" />
       </div>
+
+      {/* Category Breakdown Pie Chart */}
+      {categoryPieData.length > 0 && (
+        <div className="bc-card" style={{ marginBottom: 20 }}>
+          <p className="bc-section-title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <PieIcon size={18} color="#8B5CF6" /> Category Distribution ({filter.toUpperCase()})
+          </p>
+          <div style={{ height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={categoryPieData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={45}
+                  outerRadius={75}
+                  paddingAngle={3}
+                  dataKey="value"
+                >
+                  {categoryPieData.map((entry, index) => (
+                    <Cell key={`cell-leg-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(val) => [INR(val), "Amount"]} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+                <Legend verticalAlign="bottom" height={32} wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       <div className="bc-tab-list">
         {["all", "income", "expense"].map((f) => (
@@ -76,10 +122,10 @@ export function LedgerView({ data, refetch, userRole = "admin" }) {
         ) : (
           filtered.map((t) => (
             <div key={t.id} className="bc-ledger-row">
-              <span style={{ color: "var(--ink-soft)", fontFamily: "IBM Plex Mono, monospace", fontSize: 12, width: 85 }}>{t.date}</span>
-              <span style={{ width: 150, fontWeight: 600, color: "#FFFFFF" }}>{t.category}</span>
-              <span style={{ color: "var(--ink-soft)", flex: 1 }}>{t.note}</span>
-              <span className="bc-ledger-amount" style={{ color: t.type === "income" ? "#FFFFFF" : "#A1A1AA" }}>
+              <span style={{ color: "#64748B", fontFamily: "Consolas, monospace", fontSize: 12, width: 95 }}>{t.date}</span>
+              <span style={{ width: 150, fontWeight: 600, color: "#0F172A" }}>{t.category}</span>
+              <span style={{ color: "#64748B", flex: 1 }}>{t.note}</span>
+              <span className="bc-ledger-amount" style={{ color: t.type === "income" ? "#10B981" : "#8B5CF6" }}>
                 {t.type === "income" ? "+" : "-"}{INR(t.amount)}
               </span>
               {canEdit && (
