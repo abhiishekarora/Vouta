@@ -47,7 +47,7 @@ export function TeamView({ data, refetch, userRole = "admin" }) {
     <div>
       <div className="bc-topbar">
         <div>
-          <h1 className="bc-page-title">Team Roster</h1>
+          <h1 className="bc-page-title">Team LaZie</h1>
           <p className="bc-page-sub">{active.length} active · {onLeave.length} on leave</p>
         </div>
         {canEdit ? (
@@ -75,7 +75,7 @@ export function TeamView({ data, refetch, userRole = "admin" }) {
                     {initials(m.name)}
                   </div>
                   <div>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14.5, color: "var(--ink)" }}>{m.name}</p>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14.5, fontFamily: "var(--font-display)", color: "var(--ink)" }}>{m.name}</p>
                     <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--ink-soft)" }}>{m.role || "Unassigned"}</p>
                   </div>
                 </div>

@@ -106,7 +106,7 @@ export function ProjectsView({ data, refetch, userRole = "admin" }) {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <div>
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: "var(--ink)" }}>{p.name}</p>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: 14.5, fontFamily: "var(--font-display)", color: "var(--ink)" }}>{p.name}</p>
                     <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--ink-soft)" }}>{p.label}</p>
                   </div>
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -163,7 +163,7 @@ export function ProjectsView({ data, refetch, userRole = "admin" }) {
                       return (
                         <div key={task.id} className="bc-kanban-card">
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--ink)", flex: 1 }}>{task.title}</p>
+                            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, fontFamily: "var(--font-display)", color: "var(--ink)", flex: 1 }}>{task.title}</p>
                             {canEdit && (
                               <button
                                 className="bc-icon-btn"
