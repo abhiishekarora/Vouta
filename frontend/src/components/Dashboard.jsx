@@ -19,7 +19,7 @@ export function Dashboard({ data, setActiveTab }) {
   const dueInvoices = data.invoices.filter((i) => i.status !== "paid");
   const openTodos = data.todos.filter((t) => !t.done);
 
-  // Bar Chart Data (Last 6 Months)
+  // Bar Chart Data
   const chartData = useMemo(() => {
     const months = [];
     for (let i = 5; i >= 0; i--) {
@@ -84,7 +84,7 @@ export function Dashboard({ data, setActiveTab }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <AlertCircle size={18} color="#7C3AED" />
             <p className="bc-section-title" style={{ color: "#7C3AED", margin: 0 }}>
-              Compliance documents needing attention ({docAlerts.length})
+              Document Alerts ({docAlerts.length})
             </p>
           </div>
           {docAlerts.map((d) => {
@@ -106,12 +106,12 @@ export function Dashboard({ data, setActiveTab }) {
             style={{ marginTop: 12 }}
             onClick={() => setActiveTab("documents")}
           >
-            Review documents vault
+            View Vault
           </button>
         </div>
       )}
 
-      {/* Vibrant Stat Cards */}
+      {/* Stat Cards */}
       <div className="bc-grid bc-grid-4" style={{ marginBottom: 20 }}>
         <StatCard label="Total Balance" value={INR(allBalance)} icon={<Wallet size={18} />} tint="#F3E8FF" textColor="#7C3AED" />
         <StatCard label="Income This Month" value={INR(income)} icon={<TrendingUp size={18} />} tint="#ECFDF5" textColor="#059669" />
@@ -119,11 +119,11 @@ export function Dashboard({ data, setActiveTab }) {
         <StatCard label="Invoices Outstanding" value={dueInvoices.length} icon={<FileText size={18} />} tint="#FEF3C7" textColor="#D97706" />
       </div>
 
-      {/* Main Charts Grid: Bar Chart + Expense Pie Chart */}
+      {/* Main Charts Grid */}
       <div className="bc-grid bc-grid-2" style={{ alignItems: "start", marginBottom: 20 }}>
         {/* Income vs Expenses Bar Chart */}
         <div className="bc-card">
-          <p className="bc-section-title">Income vs Expenses — Last 6 Months</p>
+          <p className="bc-section-title">Income vs Expenses</p>
           <div style={{ height: 260, marginTop: 10 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
@@ -142,11 +142,11 @@ export function Dashboard({ data, setActiveTab }) {
         <div className="bc-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <p className="bc-section-title" style={{ margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
-              <PieIcon size={18} color="#8B5CF6" /> Expense Categories Breakdown
+              <PieIcon size={18} color="#8B5CF6" /> Expense Categories
             </p>
           </div>
           {expenseCategoryPieData.length === 0 ? (
-            <EmptyState title="No expense data" body="Add expenses to see category breakdown." />
+            <EmptyState title="No expenses recorded" body="Add expenses to see category breakdown." />
           ) : (
             <div style={{ height: 260 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -173,13 +173,13 @@ export function Dashboard({ data, setActiveTab }) {
         </div>
       </div>
 
-      {/* Secondary Grid: Tasks + Donut Overview */}
+      {/* Secondary Grid */}
       <div className="bc-grid bc-grid-2" style={{ alignItems: "start" }}>
         {/* Income vs Expense Donut Pie Chart */}
         <div className="bc-card">
-          <p className="bc-section-title">Income vs Expense Ratio</p>
+          <p className="bc-section-title">Financial Ratio</p>
           {overviewPieData.length === 0 ? (
-            <EmptyState title="No financial data" body="Record transactions to visualize income vs expense ratio." />
+            <EmptyState title="No transactions yet" body="Record transactions to visualize income vs expense ratio." />
           ) : (
             <div style={{ height: 200 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -211,7 +211,7 @@ export function Dashboard({ data, setActiveTab }) {
             <span style={{ fontSize: 12, color: "#3B82F6", fontWeight: 700 }}>{openTodos.length} pending</span>
           </div>
           {openTodos.length === 0 ? (
-            <EmptyState title="All clear" body="Nothing pending on your to-do list." />
+            <EmptyState title="No pending tasks" body="Your task list is clear." />
           ) : (
             openTodos.slice(0, 4).map((t) => (
               <div key={t.id} className="bc-ledger-row">
@@ -225,7 +225,7 @@ export function Dashboard({ data, setActiveTab }) {
           {data.todos.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <button className="bc-btn bc-btn-ghost bc-btn-sm" onClick={() => setActiveTab("todos")}>
-                View all tasks
+                View Tasks
               </button>
             </div>
           )}

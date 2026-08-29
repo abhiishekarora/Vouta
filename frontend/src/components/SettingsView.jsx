@@ -203,9 +203,9 @@ export function SettingsView({ currentUser, setCurrentUser }) {
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value)}
                   >
-                    <option value="view">View Only — Read-only access to metrics & docs</option>
-                    <option value="edit">Edit — Can create/edit goals, ledger, invoices & tasks</option>
-                    <option value="admin">Admin — Full control + manage partner invites</option>
+                    <option value="view">View Only (Read Only)</option>
+                    <option value="edit">Edit (Full Access)</option>
+                    <option value="admin">Admin (Full Access + Invites)</option>
                   </select>
                 </div>
                 <button

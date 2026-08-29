@@ -250,7 +250,7 @@ export function ProjectsView({ data, refetch, userRole = "admin" }) {
             <div className="bc-field">
               <label className="bc-label">Assign to</label>
               <select className="bc-select" value={taskForm.assignedTo} onChange={(e) => setTaskForm({ ...taskForm, assignedTo: e.target.value })}>
-                <option value="">— Unassigned —</option>
+                <option value="">Unassigned</option>
                 {data.team.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>

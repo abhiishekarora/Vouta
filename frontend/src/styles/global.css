@@ -1,6 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 :root {
-  --font-main: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI Variable Small', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'Consolas', 'Segoe UI Mono', 'Courier New', monospace;
+  --font-main: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 
   --paper: #F8FAFC;
   --paper-card: #FFFFFF;
@@ -34,10 +36,11 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  font-family: var(--font-main) !important;
 }
 
 body {
-  font-family: var(--font-main);
+  font-family: var(--font-main) !important;
   color: var(--ink);
   background-color: var(--paper);
   min-height: 100vh;
@@ -47,7 +50,7 @@ body {
 }
 
 .bc-root {
-  font-family: var(--font-main);
+  font-family: var(--font-main) !important;
   color: var(--ink);
   background: var(--paper);
   min-height: 100vh;
@@ -99,8 +102,7 @@ body {
 }
 
 .bc-auth-logo {
-  font-family: var(--font-main);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 28px;
   margin: 0 0 6px;
   color: var(--purple-dark);
@@ -165,8 +167,7 @@ body {
 }
 
 .bc-logo {
-  font-family: var(--font-main);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 26px;
   color: var(--purple-dark);
   letter-spacing: -0.02em;
@@ -313,8 +314,7 @@ body {
 }
 
 .bc-page-title {
-  font-family: var(--font-main);
-  font-weight: 700;
+  font-weight: 800;
   font-size: 30px;
   margin: 0;
   color: var(--ink);
@@ -333,7 +333,6 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-family: var(--font-main);
   font-weight: 700;
   font-size: 13.5px;
   padding: 10px 18px;
@@ -438,7 +437,7 @@ body {
   font-weight: 700;
 }
 .bc-stat-value {
-  font-family: var(--font-mono);
+  font-family: var(--font-mono) !important;
   font-size: 26px;
   font-weight: 700;
   color: var(--ink);
@@ -456,7 +455,6 @@ body {
 }
 
 .bc-section-title {
-  font-family: var(--font-main);
   font-weight: 700;
   font-size: 18px;
   margin: 0 0 16px;
@@ -477,7 +475,7 @@ body {
   border-bottom: none;
 }
 .bc-ledger-amount {
-  font-family: var(--font-mono);
+  font-family: var(--font-mono) !important;
   font-weight: 700;
   margin-left: auto;
   white-space: nowrap;
@@ -487,7 +485,7 @@ body {
 .bc-status-chip {
   display: inline-flex;
   align-items: center;
-  font-family: var(--font-mono);
+  font-family: var(--font-mono) !important;
   font-size: 11px;
   font-weight: 700;
   padding: 3px 9px;
@@ -520,7 +518,6 @@ body {
   font-size: 13.5px;
 }
 .bc-empty .bc-empty-title {
-  font-family: var(--font-main);
   font-size: 19px;
   color: var(--ink);
   font-weight: 700;
@@ -558,7 +555,6 @@ body {
   margin-bottom: 20px;
 }
 .bc-modal-title {
-  font-family: var(--font-main);
   font-weight: 700;
   font-size: 20px;
   color: var(--ink);
@@ -599,7 +595,6 @@ body {
   padding: 11px 14px;
   border: 1px solid #CBD5E1;
   border-radius: var(--radius-sm);
-  font-family: var(--font-main);
   font-size: 13.5px;
   background: #FFFFFF;
   color: var(--ink);
@@ -766,7 +761,6 @@ body {
   border-radius: 50%;
   background: linear-gradient(135deg, var(--purple-dark), var(--blue));
   color: #FFFFFF;
-  font-family: var(--font-main);
   font-weight: 700;
   font-size: 15px;
   display: flex;
@@ -789,7 +783,6 @@ body {
 .bc-kanban-col-title {
   padding-bottom: 10px;
   border-bottom: 2px solid #E2E8F0;
-  font-family: var(--font-main);
   font-weight: 700;
   font-size: 15px;
   color: var(--purple-dark);

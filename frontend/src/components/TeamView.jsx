@@ -76,7 +76,7 @@ export function TeamView({ data, refetch, userRole = "admin" }) {
                   </div>
                   <div>
                     <p style={{ margin: 0, fontWeight: 700, fontSize: 14.5, color: "#FFFFFF" }}>{m.name}</p>
-                    <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--ink-soft)" }}>{m.role || "—"}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "var(--ink-soft)" }}>{m.role || "Unassigned"}</p>
                   </div>
                 </div>
                 {canEdit && (
