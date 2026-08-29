@@ -78,17 +78,17 @@ export function InvoicesView({ data, refetch, userRole = "admin" }) {
               <div>
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                   <FileText size={16} style={{ color: "var(--ink-soft)" }} />
-                  <span style={{ fontFamily: "IBM Plex Mono, monospace", fontWeight: 700, fontSize: 13, color: "#FFFFFF" }}>
+                  <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: 13, color: "var(--purple-dark)" }}>
                     {inv.invoiceNo}
                   </span>
                   <span className="bc-status-chip">
                     {inv.status.toUpperCase()}
                   </span>
                 </div>
-                <p style={{ margin: "4px 0 0", fontSize: 14, color: "#E4E4E7" }}>{inv.client}</p>
+                <p style={{ margin: "4px 0 0", fontSize: 14, color: "var(--ink)" }}>{inv.client}</p>
               </div>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 18, fontWeight: 700, fontFamily: "IBM Plex Mono, monospace", color: "#FFFFFF" }}>{INR(inv.amount)}</span>
+                <span style={{ fontSize: 18, fontWeight: 700, fontFamily: "var(--font-mono)", color: "var(--ink)" }}>{INR(inv.amount)}</span>
                 {canEdit && (
                   <button className="bc-icon-btn" onClick={() => removeInvoice(inv.id)} aria-label="Delete invoice">
                     <Trash2 size={14} />

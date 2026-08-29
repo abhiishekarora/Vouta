@@ -103,7 +103,7 @@ export function GoalsView({ data, refetch, userRole = "admin" }) {
                 <div className="bc-progress-fill" style={{ width: pct + "%" }} />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-                <span style={{ fontSize: 12.5, color: "var(--ink-soft)", fontFamily: "IBM Plex Mono, monospace", fontWeight: 600 }}>
+                <span style={{ fontSize: 12.5, color: "var(--ink-soft)", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
                   {pct}% Completed
                 </span>
                 {canEdit && (

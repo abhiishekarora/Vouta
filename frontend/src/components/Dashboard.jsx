@@ -92,7 +92,7 @@ export function Dashboard({ data, setActiveTab }) {
             return (
               <div key={d.id} className="bc-ledger-row">
                 <span style={{ flex: 1, fontWeight: 600, color: "#0F172A" }}>{d.title}</span>
-                <span style={{ fontSize: 12, color: "#64748B", fontFamily: "Consolas, monospace" }}>
+                <span style={{ fontSize: 12, color: "#64748B", fontFamily: "var(--font-mono)" }}>
                   {d.expiryDate ? `Expires ${d.expiryDate}` : "No expiry date"}
                 </span>
                 <span className="bc-tag">
@@ -245,7 +245,7 @@ export function Dashboard({ data, setActiveTab }) {
         ) : (
           recentTx.map((t) => (
             <div key={t.id} className="bc-ledger-row">
-              <span style={{ color: "#64748B", fontFamily: "Consolas, monospace", fontSize: 12, width: 95 }}>{t.date}</span>
+              <span style={{ color: "#64748B", fontFamily: "var(--font-mono)", fontSize: 12, width: 95 }}>{t.date}</span>
               <span style={{ width: 140, fontWeight: 600, color: "#0F172A" }}>{t.category}</span>
               <span style={{ color: "#64748B", flex: 1, fontSize: 12.5 }}>{t.note}</span>
               <span

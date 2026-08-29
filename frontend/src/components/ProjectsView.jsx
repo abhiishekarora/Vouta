@@ -147,7 +147,7 @@ export function ProjectsView({ data, refetch, userRole = "admin" }) {
           {selectedProject && (
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <h2 style={{ margin: 0, fontFamily: "Zilla Slab, serif", fontSize: 20, color: "#FFFFFF" }}>{selectedProject.name}</h2>
+                <h2 style={{ margin: 0, fontSize: 20, color: "var(--ink)" }}>{selectedProject.name}</h2>
                 {canEdit && (
                   <button className="bc-btn bc-btn-ghost bc-btn-sm" onClick={() => setShowTaskModal(true)}>
                     <Plus size={13} /> Add Task

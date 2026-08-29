@@ -122,7 +122,7 @@ export function LedgerView({ data, refetch, userRole = "admin" }) {
         ) : (
           filtered.map((t) => (
             <div key={t.id} className="bc-ledger-row">
-              <span style={{ color: "#64748B", fontFamily: "Consolas, monospace", fontSize: 12, width: 95 }}>{t.date}</span>
+              <span style={{ color: "#64748B", fontFamily: "var(--font-mono)", fontSize: 12, width: 95 }}>{t.date}</span>
               <span style={{ width: 150, fontWeight: 600, color: "#0F172A" }}>{t.category}</span>
               <span style={{ color: "#64748B", flex: 1 }}>{t.note}</span>
               <span className="bc-ledger-amount" style={{ color: t.type === "income" ? "#10B981" : "#8B5CF6" }}>

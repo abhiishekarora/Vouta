@@ -22,7 +22,7 @@ export default function App() {
   if (authLoading) {
     return (
       <div className="bc-auth-page">
-        <p style={{ fontFamily: "Zilla Slab, serif", fontSize: 20, fontWeight: 600, color: "#A1A1AA" }}>
+        <p style={{ fontSize: 20, fontWeight: 600, color: "#A1A1AA" }}>
           Loading Console…
         </p>
       </div>
