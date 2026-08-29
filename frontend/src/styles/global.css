@@ -180,28 +180,37 @@ body {
   background: #FFFFFF;
   border-right: 1px solid #E2E8F0;
   color: #64748B;
-  padding: 20px 12px;
+  padding: 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   box-shadow: 4px 0 20px rgba(15, 23, 42, 0.02);
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-  position: relative;
 }
 
 .bc-sidebar.collapsed {
   width: var(--sidebar-collapsed);
-  padding: 20px 8px;
+  padding: 16px 10px;
+  align-items: center;
+}
+
+/* Top area: burger + brand on the same row */
+.bc-sidebar-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+  min-height: 36px;
+}
+.bc-sidebar.collapsed .bc-sidebar-top {
+  justify-content: center;
 }
 
 .bc-sidebar-toggle {
-  position: absolute;
-  top: 16px;
-  right: 10px;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
   border: 1px solid #E2E8F0;
   background: #FFFFFF;
   cursor: pointer;
@@ -209,12 +218,8 @@ body {
   align-items: center;
   justify-content: center;
   color: var(--ink-soft);
+  flex-shrink: 0;
   transition: all 0.2s ease;
-  z-index: 5;
-}
-.bc-sidebar.collapsed .bc-sidebar-toggle {
-  right: 50%;
-  transform: translateX(50%);
 }
 .bc-sidebar-toggle:hover {
   background: var(--purple-light);
@@ -222,41 +227,41 @@ body {
   border-color: var(--purple);
 }
 
+.bc-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .bc-logo {
   font-family: var(--font-display) !important;
   font-weight: 800;
-  font-size: 24px;
+  font-size: 22px;
   background: var(--gradient-purple-blue);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   letter-spacing: -0.02em;
-  margin: 0 4px 2px;
   white-space: nowrap;
-  transition: opacity 0.2s ease;
-}
-.bc-sidebar.collapsed .bc-logo {
-  font-size: 20px;
-  margin: 0;
-  text-align: center;
 }
 
 .bc-logo-sub {
   font-family: var(--font-display) !important;
   font-size: 9px;
   color: var(--green-dark);
-  margin: 0 4px 22px;
+  margin: 0 0 14px;
+  padding-left: 2px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 500;
   white-space: nowrap;
-  transition: opacity 0.2s ease;
 }
-.bc-sidebar.collapsed .bc-logo-sub {
-  opacity: 0;
-  height: 0;
-  margin: 0;
-  overflow: hidden;
+
+.bc-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 /* Animated Navigation Items */
