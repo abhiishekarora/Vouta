@@ -70,27 +70,44 @@ export function useConsoleData(enabled = true) {
 }
 
 /**
- * Auth state hook — validates session on mount via GET /api/auth/me.
+ * Auth state hook — restores user session instantly from local storage,
+ * then validates/syncs session with GET /api/auth/me in the background.
  *
- * The browser automatically sends the httpOnly auth cookie on this request.
- * If the cookie is missing or expired, the server returns 401 and we show
- * the login screen. No token reading from JS storage required.
+ * If /api/auth/me returns an explicit 401 (invalid/expired token), the session is cleared.
+ * Network errors or cold starts (status 0, 502, 503) keep the existing user session active.
  */
 export function useAuthState() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(() => api.userStorage.get());
+  const [authLoading, setAuthLoading] = useState(() => !api.userStorage.get());
 
   useEffect(() => {
-    // Always attempt /me — the browser sends the cookie if it exists.
-    // If the cookie is absent or expired, /me returns 401 and we stay logged out.
     api.auth.me()
-      .then((res) => setCurrentUser(res?.user ?? null))
-      .catch(() => {
-        // 401 or network error — user is not authenticated
-        setCurrentUser(null);
+      .then((res) => {
+        if (res?.user) {
+          api.userStorage.set(res.user);
+          setCurrentUser(res.user);
+        }
+      })
+      .catch((err) => {
+        // ONLY redirect to login if server explicitly responded with 401 Unauthorized
+        if (err.status === 401) {
+          api.token.clear();
+          api.userStorage.clear();
+          setCurrentUser(null);
+        }
       })
       .finally(() => setAuthLoading(false));
   }, []);
 
-  return { currentUser, setCurrentUser, authLoading };
+  const handleSetUser = (u) => {
+    if (u) {
+      api.userStorage.set(u);
+    } else {
+      api.token.clear();
+      api.userStorage.clear();
+    }
+    setCurrentUser(u);
+  };
+
+  return { currentUser, setCurrentUser: handleSetUser, authLoading };
 }

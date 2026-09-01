@@ -27,6 +27,28 @@ export const token = {
   clear: () => {
     try {
       localStorage.removeItem("vouta_token");
+      localStorage.removeItem("vouta_user");
+    } catch {}
+  },
+};
+
+export const userStorage = {
+  get: () => {
+    try {
+      const u = localStorage.getItem("vouta_user");
+      return u ? JSON.parse(u) : null;
+    } catch {
+      return null;
+    }
+  },
+  set: (u) => {
+    try {
+      if (u) localStorage.setItem("vouta_user", JSON.stringify(u));
+    } catch {}
+  },
+  clear: () => {
+    try {
+      localStorage.removeItem("vouta_user");
     } catch {}
   },
 };
