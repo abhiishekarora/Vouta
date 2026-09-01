@@ -18,6 +18,9 @@ const projectsRoutes     = require("./routes/projects");
 const projectTasksRoutes = require("./routes/projectTasks");
 const documentsRoutes    = require("./routes/documents");
 
+const { testConnection } = require("./config/db");
+testConnection().catch((err) => console.error("[DB] Migration error on boot:", err));
+
 const app = express();
 
 // ─── Multer — in-memory file storage ─────────────────────────────

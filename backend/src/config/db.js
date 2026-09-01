@@ -32,11 +32,26 @@ async function testConnection() {
   try {
     const client = await pool.connect();
     const { rows } = await client.query("SELECT version()");
-    client.release();
     console.log(`[DB] Connected — ${rows[0].version.split(" ").slice(0, 2).join(" ")}`);
+
+    // Ensure file columns exist on documents and invoices tables
+    await client.query(`
+      ALTER TABLE documents
+        ADD COLUMN IF NOT EXISTS file_data BYTEA,
+        ADD COLUMN IF NOT EXISTS file_name TEXT,
+        ADD COLUMN IF NOT EXISTS file_mime TEXT;
+
+      ALTER TABLE invoices
+        ADD COLUMN IF NOT EXISTS file_data BYTEA,
+        ADD COLUMN IF NOT EXISTS file_name TEXT,
+        ADD COLUMN IF NOT EXISTS file_mime TEXT;
+    `);
+    console.log("[DB] Schema auto-migration: verified file columns in documents & invoices.");
+
+    client.release();
     return true;
   } catch (err) {
-    console.error("[DB] Connection failed:", err.message);
+    console.error("[DB] Connection or migration failed:", err.message);
     return false;
   }
 }
