@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Plus, Trash2, Search, FileText, AlertTriangle, Eye } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Plus, Trash2, Search, FileText, AlertTriangle, Eye, Paperclip, Download, X, Upload } from "lucide-react";
 import { Modal, EmptyState } from "./Modal";
 import { todayISO } from "../utils/helpers";
 import * as api from "../utils/api";
@@ -10,11 +10,19 @@ const DOC_CATEGORIES = [
   "IP / Trademark", "Contracts", "Other"
 ];
 
+const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+const MAX_SIZE_MB = 5;
+
 export function DocumentsView({ data, refetch, userRole = "admin" }) {
-  const [showModal, setShowModal] = useState(false);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All");
-  const [saving, setSaving] = useState(false);
+  const [showModal, setShowModal]     = useState(false);
+  const [search, setSearch]           = useState("");
+  const [category, setCategory]       = useState("All");
+  const [saving, setSaving]           = useState(false);
+  const [uploading, setUploading]     = useState(null); // doc id being uploaded
+  const [fileError, setFileError]     = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
+
   const [form, setForm] = useState({
     title: "", category: DOC_CATEGORIES[1], docNumber: "",
     issueDate: "", expiryDate: "", status: "Filed", notes: "", content: "",
@@ -22,17 +30,30 @@ export function DocumentsView({ data, refetch, userRole = "admin" }) {
 
   const canEdit = userRole !== "view";
 
+  // ── Create document (metadata only; file uploaded separately after save)
   const addDoc = async () => {
     if (!form.title.trim()) return;
     setSaving(true);
+    setFileError("");
     try {
-      await api.documents.create({
+      const doc = await api.documents.create({
         ...form,
         issueDate: form.issueDate || null,
         expiryDate: form.expiryDate || null,
       });
+
+      // If a file was selected in the modal, upload it straight away
+      if (selectedFile && doc?.id) {
+        try {
+          await api.documents.upload(doc.id, selectedFile);
+        } catch (uploadErr) {
+          setFileError(`Document saved, but file upload failed: ${uploadErr.message}`);
+        }
+      }
+
       await refetch();
       setForm({ title: "", category: DOC_CATEGORIES[1], docNumber: "", issueDate: "", expiryDate: "", status: "Filed", notes: "", content: "" });
+      setSelectedFile(null);
       setShowModal(false);
     } finally {
       setSaving(false);
@@ -43,6 +64,57 @@ export function DocumentsView({ data, refetch, userRole = "admin" }) {
     if (!canEdit) return;
     await api.documents.remove(id);
     await refetch();
+  };
+
+  // ── Attach / replace file on existing document card
+  const handleCardUpload = async (doc, file) => {
+    if (!file) return;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      alert("Only PDF, JPG, or PNG files are allowed.");
+      return;
+    }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      alert(`File must be under ${MAX_SIZE_MB}MB.`);
+      return;
+    }
+    setUploading(doc.id);
+    try {
+      await api.documents.upload(doc.id, file);
+      await refetch();
+    } catch (err) {
+      alert(err.message || "Upload failed.");
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const handleRemoveFile = async (doc) => {
+    if (!canEdit) return;
+    if (!confirm(`Remove the attached file from "${doc.title}"?`)) return;
+    try {
+      await api.documents.removeFile(doc.id);
+      await refetch();
+    } catch (err) {
+      alert(err.message || "Failed to remove file.");
+    }
+  };
+
+  // ── Modal file selection
+  const handleModalFileChange = (e) => {
+    const file = e.target.files?.[0];
+    setFileError("");
+    if (!file) { setSelectedFile(null); return; }
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setFileError("Only PDF, JPG, or PNG files are allowed.");
+      setSelectedFile(null);
+      return;
+    }
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      setFileError(`File must be under ${MAX_SIZE_MB}MB.`);
+      setSelectedFile(null);
+      return;
+    }
+    setSelectedFile(file);
   };
 
   const today = todayISO();
@@ -134,12 +206,71 @@ export function DocumentsView({ data, refetch, userRole = "admin" }) {
                     )}
                   </div>
                 </div>
-                {canEdit && (
-                  <button className="bc-icon-btn" onClick={() => removeDoc(d.id)} aria-label="Delete document">
-                    <Trash2 size={14} />
-                  </button>
-                )}
+
+                {/* Action buttons */}
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+                  {/* View/download file */}
+                  {d.hasFile && (
+                    <button
+                      className="bc-btn bc-btn-ghost bc-btn-sm"
+                      onClick={() => api.documents.viewFile(d.id, d.fileName)}
+                      title={`View ${d.fileName}`}
+                      style={{ gap: 4 }}
+                    >
+                      <Download size={13} /> {d.fileMime === "application/pdf" ? "PDF" : "Image"}
+                    </button>
+                  )}
+
+                  {/* Upload / replace file */}
+                  {canEdit && (
+                    <>
+                      <label
+                        className="bc-btn bc-btn-ghost bc-btn-sm"
+                        title={d.hasFile ? "Replace file" : "Attach file (PDF/JPG/PNG)"}
+                        style={{ cursor: "pointer", gap: 4, margin: 0 }}
+                      >
+                        {uploading === d.id ? (
+                          <span style={{ fontSize: 11 }}>Uploading…</span>
+                        ) : (
+                          <><Paperclip size={13} /> {d.hasFile ? "Replace" : "Attach"}</>
+                        )}
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          style={{ display: "none" }}
+                          disabled={uploading === d.id}
+                          onChange={(e) => handleCardUpload(d, e.target.files?.[0])}
+                        />
+                      </label>
+
+                      {/* Remove attached file */}
+                      {d.hasFile && (
+                        <button
+                          className="bc-icon-btn"
+                          onClick={() => handleRemoveFile(d)}
+                          title="Remove attached file"
+                          style={{ color: "var(--brick)" }}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+
+                      <button className="bc-icon-btn" onClick={() => removeDoc(d.id)} aria-label="Delete document">
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
+
+              {/* File attachment badge */}
+              {d.hasFile && (
+                <p style={{ margin: "8px 0 0", fontSize: 11.5, color: "var(--ink-soft)", display: "flex", alignItems: "center", gap: 4 }}>
+                  <Paperclip size={11} />
+                  {d.fileName}
+                </p>
+              )}
+
               {d.notes && <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "var(--ink-soft)" }}>{d.notes}</p>}
             </div>
           );
@@ -147,7 +278,7 @@ export function DocumentsView({ data, refetch, userRole = "admin" }) {
       )}
 
       {showModal && canEdit && (
-        <Modal title="Add Document" onClose={() => setShowModal(false)}>
+        <Modal title="Add Document" onClose={() => { setShowModal(false); setSelectedFile(null); setFileError(""); }}>
           <div className="bc-field">
             <label className="bc-label">Document Title</label>
             <input className="bc-input" placeholder="e.g. GST Registration Certificate" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} autoFocus />
@@ -178,6 +309,44 @@ export function DocumentsView({ data, refetch, userRole = "admin" }) {
             <label className="bc-label">Notes</label>
             <textarea className="bc-textarea" rows={2} placeholder="Any relevant details…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>
+
+          {/* ── File attachment ── */}
+          <div className="bc-field">
+            <label className="bc-label">
+              Attach File <span style={{ color: "var(--ink-soft)", fontWeight: 400 }}>(PDF, JPG, or PNG — max 5 MB)</span>
+            </label>
+            <label
+              style={{
+                display: "flex", alignItems: "center", gap: 8, padding: "9px 12px",
+                border: "1.5px dashed var(--border)", borderRadius: 8, cursor: "pointer",
+                background: selectedFile ? "var(--surface-alt)" : "transparent", fontSize: 13,
+                color: "var(--ink-soft)", transition: "background 0.15s",
+              }}
+            >
+              <Upload size={15} />
+              {selectedFile
+                ? <span style={{ color: "var(--ink)", fontWeight: 500 }}>{selectedFile.name} ({(selectedFile.size / 1024).toFixed(0)} KB)</span>
+                : "Click to select or drag a file here"}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                style={{ display: "none" }}
+                onChange={handleModalFileChange}
+              />
+            </label>
+            {selectedFile && (
+              <button
+                type="button"
+                style={{ marginTop: 4, fontSize: 12, color: "var(--brick)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+              >
+                ✕ Remove file
+              </button>
+            )}
+            {fileError && <p className="bc-error-text" style={{ marginTop: 4 }}>{fileError}</p>}
+          </div>
+
           <button className="bc-btn bc-btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={addDoc} disabled={saving}>
             {saving ? "Saving…" : "Save Document"}
           </button>

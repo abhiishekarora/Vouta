@@ -1,22 +1,45 @@
 const jwt = require("jsonwebtoken");
 const { pool } = require("../config/db");
 
-const DEFAULT_JWT_SECRET = "00a659ca0fda44eb79130032f81bf750850a0a7b347175b9834bbd1afe75a327d68f60ee9ccf5ad42e4a040c103606dbeb3e6e3f360de26c91b9429d29484ee6";
+if (!process.env.JWT_SECRET) {
+  console.error("[Auth] FATAL: JWT_SECRET environment variable is not set. Server cannot start securely.");
+  process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
- * Verifies the JWT Bearer token from the Authorization header.
+ * Resolves the JWT from the request.
+ *
+ * Priority order:
+ *  1. httpOnly cookie `vouta_token`  — set by /auth/login and /auth/register (production path)
+ *  2. Authorization: Bearer <token>  — fallback for local dev, curl, Postman
+ *
+ * This dual-source approach lets the cookie migration roll out without breaking
+ * existing sessions or developer tooling.
+ */
+function extractToken(req) {
+  if (req.cookies && req.cookies.vouta_token) {
+    return req.cookies.vouta_token;
+  }
+  const authHeader = req.headers["authorization"];
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    return authHeader.slice(7);
+  }
+  return null;
+}
+
+/**
+ * Verifies the JWT from cookie (primary) or Authorization header (fallback).
  * Attaches decoded user payload + workspace role to req.user.
  */
 async function authenticate(req, res, next) {
-  const authHeader = req.headers["authorization"];
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  const token = extractToken(req);
+  if (!token) {
     return res.status(401).json({ error: "No authentication token provided." });
   }
 
-  const token = authHeader.slice(7);
-  const secret = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
   try {
-    const payload = jwt.verify(token, secret);
+    const payload = jwt.verify(token, JWT_SECRET);
     req.user = payload; // { id, email, businessName, iat, exp }
 
     // Resolve workspace owner ID and user role

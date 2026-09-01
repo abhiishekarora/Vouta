@@ -1,0 +1,13 @@
+# Render Static Site — HTTP Security Headers
+# Applied to every response served from the dist/ folder.
+#
+# font-src https://fonts.gstatic.com  — required for Google Fonts loaded in global.css
+# style-src 'unsafe-inline'           — required for React inline style={{}} attributes throughout the app
+# connect-src https://vouta-backend.onrender.com — cross-origin API calls to the backend
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://vouta-backend.onrender.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  X-Content-Type-Options: nosniff

@@ -5,6 +5,7 @@ const helmet = require("helmet");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
+const multer = require("multer");
 
 // ─── Route Imports ────────────────────────────────────────────────
 const authRoutes         = require("./routes/auth");
@@ -18,6 +19,26 @@ const projectTasksRoutes = require("./routes/projectTasks");
 const documentsRoutes    = require("./routes/documents");
 
 const app = express();
+
+// ─── Multer — in-memory file storage ─────────────────────────────
+// Accepted MIME types for uploaded files
+const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png"];
+const FILE_SIZE_LIMIT = 5 * 1024 * 1024; // 5 MB
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: FILE_SIZE_LIMIT },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_MIME.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE", "Only PDF, JPEG, and PNG files are allowed."));
+    }
+  },
+});
+
+// Export multer instance so route files can use it
+app.set("upload", upload);
 
 // ─── Security Headers (helmet) ────────────────────────────────────
 app.use(helmet({
@@ -34,16 +55,14 @@ const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow no-origin (curl, Postman, same-origin)
+    // Allow no-origin requests (curl, Postman, server-to-server)
     if (!origin) return callback(null, true);
 
-    // Exact match list
+    // Exact match against the explicit allowlist only.
+    // NOTE: The *.vercel.app wildcard has been intentionally removed —
+    // it is unsafe to auto-approve unknown origins when credentials:true
+    // because any Vercel-hosted page could make authenticated requests.
     if (allowedOrigins.includes(origin)) return callback(null, true);
-
-    // Allow all *.vercel.app preview deployments automatically
-    if (/^https:\/\/[a-z0-9-]+(\.vercel\.app)$/.test(origin)) {
-      return callback(null, true);
-    }
 
     callback(new Error(`CORS: Origin '${origin}' not allowed.`));
   },
@@ -68,15 +87,18 @@ app.use(rateLimit({
   message: { error: "Too many requests. Please slow down." },
 }));
 
-// ─── Auth-specific rate limiter: 10 req / 15 min per IP ──────────
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+
+// ─── Upload-specific rate limiter: 5 uploads / min per IP ────────
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many login attempts. Try again in 15 minutes." },
-  skipSuccessfulRequests: true,
+  message: { error: "Too many file uploads. Please wait a minute before trying again." },
 });
+
+// Export upload limiter for use in routes
+app.set("uploadLimiter", uploadLimiter);
 
 // ─── Health check ─────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
@@ -84,7 +106,7 @@ app.get("/health", (_req, res) => {
 });
 
 // ─── API Routes ───────────────────────────────────────────────────
-app.use("/api/auth",          authLimiter, authRoutes);
+app.use("/api/auth",          authRoutes);  // authLimiter is scoped per-route inside routes/auth.js
 app.use("/api/goals",         goalsRoutes);
 app.use("/api/transactions",  transactionsRoutes);
 app.use("/api/invoices",      invoicesRoutes);
@@ -93,6 +115,17 @@ app.use("/api/team",          teamRoutes);
 app.use("/api/projects",      projectsRoutes);
 app.use("/api/project-tasks", projectTasksRoutes);
 app.use("/api/documents",     documentsRoutes);
+
+// ─── Multer error handler (must be after routes) ──────────────────
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({ error: "File too large. Maximum size is 5MB." });
+    }
+    return res.status(400).json({ error: err.message || "File upload error." });
+  }
+  next(err);
+});
 
 // ─── 404 handler ─────────────────────────────────────────────────
 app.use((_req, res) => {

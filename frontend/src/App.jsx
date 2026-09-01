@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import "./styles/global.css";
 import { useConsoleData, useAuthState } from "./utils/storage";
-import { token as tokenStore } from "./utils/api";
+import { auth, token as tokenStore } from "./utils/api";
 import { Auth } from "./components/Auth";
 import { Sidebar } from "./components/Sidebar";
 import { Dashboard } from "./components/Dashboard";
@@ -60,7 +60,12 @@ export default function App() {
     );
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await auth.logout(); // Clears the httpOnly cookie server-side
+    } catch {
+      // Ignore errors — clear local state regardless
+    }
     tokenStore.clear();
     setCurrentUser(null);
   };

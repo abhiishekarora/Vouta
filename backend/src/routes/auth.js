@@ -1,10 +1,23 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const rateLimit = require("express-rate-limit");
 const { z } = require("zod");
 const { pool } = require("../config/db");
 const { validate } = require("../middleware/validate");
 const { authenticate, requireRole } = require("../middleware/auth");
+
+// ─── Auth-specific rate limiter (login + register only) ───────────
+// Applied directly to the write routes so that GET /auth/me (which fires
+// on every page load without a cookie) does NOT consume the budget.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Please try again in 15 minutes." },
+  skipSuccessfulRequests: true,
+});
 
 const router = express.Router();
 
@@ -37,7 +50,42 @@ const roleSchema = z.object({
   role: z.enum(["view", "edit", "admin"]),
 });
 
-const DEFAULT_JWT_SECRET = "00a659ca0fda44eb79130032f81bf750850a0a7b347175b9834bbd1afe75a327d68f60ee9ccf5ad42e4a040c103606dbeb3e6e3f360de26c91b9429d29484ee6";
+// ─── Cookie config ─────────────────────────────────────────────────
+// JWT_EXPIRES_IN is e.g. "7d". Convert to milliseconds for cookie maxAge.
+function cookieMaxAgeMs() {
+  const raw = process.env.JWT_EXPIRES_IN || "7d";
+  const match = raw.match(/^(\d+)([smhd])$/);
+  if (!match) return 7 * 24 * 60 * 60 * 1000; // default 7 days
+  const [, n, unit] = match;
+  const mul = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
+  return parseInt(n, 10) * (mul[unit] || 86_400_000);
+}
+
+/**
+ * Set the JWT as an httpOnly, Secure cookie.
+ *
+ * Security properties:
+ *  - httpOnly: JS on the page cannot read this cookie — XSS cannot exfiltrate the token.
+ *  - secure:   Sent over HTTPS only in production.
+ *  - sameSite: "none" in production — required because vouta-frontend.onrender.com and
+ *    vouta-backend.onrender.com are cross-site (onrender.com is in the Public Suffix List,
+ *    so each subdomain is its own eTLD+1). SameSite=Strict/Lax cookies are NEVER sent on
+ *    cross-site requests, which would cause every authenticated call to return 401.
+ *    SameSite=None + Secure allows cross-site cookies over HTTPS.
+ *    CSRF is still mitigated by: the CORS origin allowlist, the httpOnly flag, and JWT validation.
+ *  - sameSite: "lax" in development — localhost is same-site through the Vite proxy, and
+ *    "none" requires Secure which doesn't work on plain HTTP localhost.
+ */
+function setAuthCookie(res, token) {
+  const isProd = process.env.NODE_ENV === "production";
+  res.cookie("vouta_token", token, {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
+    maxAge: cookieMaxAgeMs(),
+    path: "/",
+  });
+}
 
 function signToken(user) {
   return jwt.sign(
@@ -46,13 +94,13 @@ function signToken(user) {
       email: user.email,
       businessName: user.business_name,
     },
-    process.env.JWT_SECRET || DEFAULT_JWT_SECRET,
+    process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
   );
 }
 
 // ─── POST /api/auth/register ──────────────────────────────────────
-router.post("/register", validate(registerSchema), async (req, res) => {
+router.post("/register", authLimiter, validate(registerSchema), async (req, res) => {
   const { email, password, ownerName, businessName, businessType } = req.body;
   try {
     const existing = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
@@ -70,7 +118,11 @@ router.post("/register", validate(registerSchema), async (req, res) => {
 
     const user = rows[0];
     const token = signToken(user);
-    return res.status(201).json({ token, user: sanitizeUser(user, "admin") });
+
+    // Set httpOnly cookie AND return token in JSON body for dual auth support
+    setAuthCookie(res, token);
+
+    return res.status(201).json({ user: sanitizeUser(user, "admin"), token });
   } catch (err) {
     console.error("[Auth] Register error:", err.message);
     return res.status(500).json({ error: "Registration failed. Please try again." });
@@ -78,7 +130,7 @@ router.post("/register", validate(registerSchema), async (req, res) => {
 });
 
 // ─── POST /api/auth/login ─────────────────────────────────────────
-router.post("/login", validate(loginSchema), async (req, res) => {
+router.post("/login", authLimiter, validate(loginSchema), async (req, res) => {
   const { email, password } = req.body;
   try {
     const { rows } = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
@@ -94,11 +146,29 @@ router.post("/login", validate(loginSchema), async (req, res) => {
     }
 
     const token = signToken(user);
-    return res.json({ token, user: sanitizeUser(user, "admin") });
+
+    // Set httpOnly cookie AND return token in JSON body for dual auth support
+    setAuthCookie(res, token);
+
+    return res.json({ user: sanitizeUser(user, "admin"), token });
   } catch (err) {
     console.error("[Auth] Login error:", err.message);
     return res.status(500).json({ error: "Login failed. Please try again." });
   }
+});
+
+// ─── POST /api/auth/logout ────────────────────────────────────────
+// Clears the httpOnly auth cookie. JS on the page cannot clear it directly,
+// so this server-side endpoint is the only way to invalidate the session.
+router.post("/logout", (req, res) => {
+  const isProd = process.env.NODE_ENV === "production";
+  res.clearCookie("vouta_token", {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",  // Must match setAuthCookie flags exactly
+    path: "/",
+  });
+  return res.json({ message: "Logged out successfully." });
 });
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────

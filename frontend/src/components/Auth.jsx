@@ -20,7 +20,7 @@ export function Auth({ onLoginSuccess }) {
     setLoading(true);
     try {
       const res = await auth.login({ email, password });
-      tokenStore.set(res.token);
+      if (res?.token) tokenStore.set(res.token);
       onLoginSuccess(res.user);
     } catch (err) {
       setError(err.message || "Login failed. Please check your credentials.");
@@ -43,7 +43,7 @@ export function Auth({ onLoginSuccess }) {
     setLoading(true);
     try {
       const res = await auth.register({ email, password, ownerName, businessName, businessType });
-      tokenStore.set(res.token);
+      if (res?.token) tokenStore.set(res.token);
       onLoginSuccess(res.user);
     } catch (err) {
       setError(err.message || "Registration failed. Please try again.");

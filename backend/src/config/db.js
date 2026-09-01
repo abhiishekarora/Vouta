@@ -1,18 +1,20 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 
-const DEFAULT_NEON_URL = "postgresql://neondb_owner:npg_q9xjJBHo3FpM@ep-snowy-scene-azhbnqs8-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=verify-full";
-
 const connectionString =
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL ||
   process.env.POSTGRES_PRISMA_URL ||
   process.env.DATABASE_URL_UNPOOLED ||
-  process.env.POSTGRES_URL_NON_POOLING ||
-  DEFAULT_NEON_URL;
+  process.env.POSTGRES_URL_NON_POOLING;
 
-// Managed Neon PostgreSQL requires SSL
-const sslConfig = { rejectUnauthorized: false };
+if (!connectionString) {
+  console.error("[DB] FATAL: No DATABASE_URL environment variable is set. Cannot connect to database.");
+  process.exit(1);
+}
+
+// Managed Neon PostgreSQL requires SSL with proper certificate validation
+const sslConfig = { rejectUnauthorized: true };
 
 const pool = new Pool({
   connectionString,
