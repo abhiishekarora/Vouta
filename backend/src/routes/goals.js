@@ -2,10 +2,11 @@ const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
 const { authenticate, requireRole } = require("../middleware/auth");
-const { validate } = require("../middleware/validate");
+const { validate, isoDate, amount, uuidParam } = require("../middleware/validate");
 
 const router = express.Router();
 router.use(authenticate);
+router.param("id", uuidParam);
 
 const GOAL_CATEGORIES = ["financial", "milestone", "deadline", "build"];
 const GOAL_STATUSES = ["active", "completed", "archived"];
@@ -13,11 +14,19 @@ const GOAL_STATUSES = ["active", "completed", "archived"];
 const goalSchema = z.object({
   title: z.string().min(1, "Title is required.").max(200).trim(),
   category: z.enum(GOAL_CATEGORIES).default("financial"),
-  targetAmount: z.coerce.number().positive("Target amount must be positive.").optional().nullable(),
-  currentAmount: z.coerce.number().min(0).default(0),
-  deadline: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format.").optional().nullable(),
+  targetAmount: amount.positive("Target amount must be positive.").optional().nullable(),
+  currentAmount: amount.min(0, "Progress cannot be negative.").default(0),
+  deadline: isoDate.optional().nullable(),
   note: z.string().max(1000).trim().default(""),
 });
+
+const goalPatchSchema = goalSchema
+  .omit({ currentAmount: true })
+  .extend({
+    currentAmount: amount.min(0, "Progress cannot be negative."),
+    status: z.enum(GOAL_STATUSES),
+  })
+  .partial();
 
 // GET /api/goals
 router.get("/", async (req, res) => {
@@ -52,18 +61,16 @@ router.post("/", requireRole(["admin", "edit"]), validate(goalSchema), async (re
 });
 
 // PATCH /api/goals/:id
-router.patch("/:id", requireRole(["admin", "edit"]), async (req, res) => {
+router.patch("/:id", requireRole(["admin", "edit"]), validate(goalPatchSchema), async (req, res) => {
   const ownerId = req.user.effectiveUserId || req.user.id;
+  const columns = {
+    title: "title", category: "category", targetAmount: "target_amount",
+    currentAmount: "current_amount", deadline: "deadline", note: "note", status: "status",
+  };
   const updates = {};
-  const body = req.body;
-
-  if (body.title !== undefined)         updates.title          = String(body.title).slice(0, 200);
-  if (body.category !== undefined)      updates.category       = GOAL_CATEGORIES.includes(body.category) ? body.category : "financial";
-  if (body.targetAmount !== undefined)  updates.target_amount  = body.targetAmount !== null ? Number(body.targetAmount) : null;
-  if (body.currentAmount !== undefined) updates.current_amount = Number(body.currentAmount);
-  if (body.deadline !== undefined)      updates.deadline       = body.deadline || null;
-  if (body.note !== undefined)          updates.note           = String(body.note).slice(0, 1000);
-  if (body.status !== undefined)        updates.status         = GOAL_STATUSES.includes(body.status) ? body.status : "active";
+  for (const [key, col] of Object.entries(columns)) {
+    if (req.body[key] !== undefined) updates[col] = req.body[key];
+  }
 
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: "No valid fields to update." });

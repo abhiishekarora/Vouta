@@ -3,6 +3,7 @@ import { Plus, Trash2, Eye, CheckCircle2, Target, Calendar, Hammer, DollarSign }
 import { Modal, EmptyState } from "./Modal";
 import { INR } from "../utils/helpers";
 import * as api from "../utils/api";
+import { notify } from "../utils/toast";
 
 const CATEGORIES = [
   { id: "financial", label: "Financial", icon: <DollarSign size={14} />, color: "#10B981" },
@@ -28,8 +29,8 @@ export function GoalsView({ data, refetch, userRole = "admin" }) {
   const canEdit = userRole !== "view";
 
   const addGoal = async () => {
-    if (!form.title.trim()) return;
-    if (form.category === "financial" && !form.targetAmount) return;
+    if (!form.title.trim()) return notify("Please enter a goal title.");
+    if (form.category === "financial" && !(Number(form.targetAmount) > 0)) return notify("Please enter a target amount greater than 0.");
     setSaving(true);
     try {
       await api.goals.create({
@@ -49,6 +50,7 @@ export function GoalsView({ data, refetch, userRole = "admin" }) {
   };
 
   const removeGoal = async (id) => {
+    if (!window.confirm("Delete this goal? This cannot be undone.")) return;
     await api.goals.remove(id);
     await refetch();
   };
@@ -61,7 +63,7 @@ export function GoalsView({ data, refetch, userRole = "admin" }) {
 
   const contribute = async (id) => {
     const amt = Number(contribAmount);
-    if (!amt) return;
+    if (!(amt > 0)) return notify("Enter an amount greater than 0.");
     const goal = data.goals.find((g) => g.id === id);
     if (!goal) return;
     await api.goals.update(id, { currentAmount: (goal.currentAmount || 0) + amt });

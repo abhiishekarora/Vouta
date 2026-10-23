@@ -4,6 +4,8 @@ export const INR = (n) =>
   "\u20B9" + Number(n || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
 export const monthKey = (d) => {
+  // "YYYY-MM-DD" strings from the API: take the month directly (new Date() would parse as UTC)
+  if (typeof d === "string" && /^\d{4}-\d{2}/.test(d)) return d.slice(0, 7);
   const dt = new Date(d);
   return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0");
 };
@@ -15,7 +17,11 @@ export const monthLabel = (key) => {
   return dt.toLocaleDateString("en-US", { month: "short", year: "2-digit" });
 };
 
-export const todayISO = () => new Date().toISOString().slice(0, 10);
+// Local calendar date. toISOString() is UTC, which gives yesterday's date before 05:30 in India.
+export const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 export const EXPENSE_CATEGORIES = [
   "Rent", "Salaries", "Marketing", "Software & tools", "Travel",

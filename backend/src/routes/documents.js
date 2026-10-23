@@ -2,25 +2,19 @@ const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
 const { authenticate, requireRole } = require("../middleware/auth");
-const { validate } = require("../middleware/validate");
+const { validate, isoDate, uuidParam } = require("../middleware/validate");
+const { sendStoredFile } = require("../utils/files");
 
 const router = express.Router();
 router.use(authenticate);
-
-// Helper to get upload middleware and rate limiter from the app instance
-function getUpload(req) {
-  return req.app.get("upload");
-}
-function getUploadLimiter(req) {
-  return req.app.get("uploadLimiter");
-}
+router.param("id", uuidParam);
 
 const docSchema = z.object({
   title:      z.string().min(1, "Title is required.").max(300).trim(),
   category:   z.string().max(100).trim().default("Other"),
   docNumber:  z.string().max(100).trim().default(""),
-  issueDate:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  issueDate:  isoDate.optional().nullable(),
+  expiryDate: isoDate.optional().nullable(),
   status:     z.string().max(50).trim().default("Filed"),
   notes:      z.string().max(1000).trim().default(""),
   content:    z.string().max(10000).trim().default(""),
@@ -89,14 +83,7 @@ router.delete("/:id", requireRole(["admin", "edit"]), async (req, res) => {
 });
 
 // POST /api/documents/:id/upload — attach a PDF/JPG/PNG file to a document
-router.post("/:id/upload", requireRole(["admin", "edit"]), (req, res, next) => {
-  // Apply upload rate limiter dynamically
-  const limiter = getUploadLimiter(req);
-  limiter(req, res, () => {
-    const upload = getUpload(req);
-    upload.single("file")(req, res, next);
-  });
-}, async (req, res) => {
+router.post("/:id/upload", requireRole(["admin", "edit"]), (req, res, next) => req.app.get("singleFileUpload")(req, res, next), async (req, res) => {
   const ownerId = req.user.effectiveUserId || req.user.id;
 
   if (!req.file) {
@@ -134,11 +121,7 @@ router.get("/:id/file", async (req, res) => {
     if (!rows[0] || !rows[0].file_data) {
       return res.status(404).json({ error: "No file attached to this document." });
     }
-    const { file_data, file_name, file_mime } = rows[0];
-    res.setHeader("Content-Type", file_mime);
-    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(file_name)}"`);
-    res.setHeader("Content-Length", file_data.length);
-    return res.send(file_data);
+    return sendStoredFile(res, rows[0]);
   } catch (err) {
     console.error("[Documents] File download error:", err.message);
     return res.status(500).json({ error: "Failed to retrieve file." });

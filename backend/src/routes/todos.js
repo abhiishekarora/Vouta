@@ -2,15 +2,16 @@ const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
 const { authenticate, requireRole } = require("../middleware/auth");
-const { validate } = require("../middleware/validate");
+const { validate, isoDate, uuidParam } = require("../middleware/validate");
 
 const router = express.Router();
 router.use(authenticate);
+router.param("id", uuidParam);
 
 const todoSchema = z.object({
   text:     z.string().min(1, "Task text is required.").max(500).trim(),
   priority: z.enum(["high", "medium", "low"]).default("medium"),
-  dueDate:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  dueDate:  isoDate.optional().nullable(),
 });
 
 // GET /api/todos

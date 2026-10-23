@@ -3,6 +3,7 @@ import { Plus, Trash2, Search, FileText, AlertTriangle, Eye, Paperclip, Download
 import { Modal, EmptyState } from "./Modal";
 import { todayISO } from "../utils/helpers";
 import * as api from "../utils/api";
+import { notify } from "../utils/toast";
 
 const DOC_CATEGORIES = [
   "All", "GST Registration", "ROC Filing", "Trade License",
@@ -32,7 +33,7 @@ export function DocumentsView({ data, refetch, userRole = "admin" }) {
 
   // ── Create document (metadata only; file uploaded separately after save)
   const addDoc = async () => {
-    if (!form.title.trim()) return;
+    if (!form.title.trim()) return notify("Please enter a document title.");
     setSaving(true);
     setFileError("");
     try {
@@ -47,7 +48,7 @@ export function DocumentsView({ data, refetch, userRole = "admin" }) {
         try {
           await api.documents.upload(doc.id, selectedFile);
         } catch (uploadErr) {
-          setFileError(`Document saved, but file upload failed: ${uploadErr.message}`);
+          notify(`Document saved, but file upload failed: ${uploadErr.message}`);
         }
       }
 
@@ -62,6 +63,7 @@ export function DocumentsView({ data, refetch, userRole = "admin" }) {
 
   const removeDoc = async (id) => {
     if (!canEdit) return;
+    if (!window.confirm("Delete this document and its attached file? This cannot be undone.")) return;
     await api.documents.remove(id);
     await refetch();
   };

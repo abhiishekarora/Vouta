@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Save, UserPlus, Trash2, Shield, Eye, Edit2, ShieldAlert, LogOut } from "lucide-react";
+import { Save, UserPlus, Trash2, ShieldAlert, LogOut, Mail } from "lucide-react";
 import { BUSINESS_TYPES } from "../utils/helpers";
 import * as api from "../utils/api";
 
-export function SettingsView({ currentUser, setCurrentUser, onLogout }) {
+export function SettingsView({ currentUser, setCurrentUser, onLogout, onWorkspaceChange }) {
   const [form, setForm] = useState({
     ownerName: currentUser?.ownerName ?? "",
     businessName: currentUser?.businessName ?? "",
     businessType: currentUser?.businessType ?? BUSINESS_TYPES[0],
   });
+  // Keep the form in sync when the workspace changes (accepting or leaving an invitation)
+  useEffect(() => {
+    setForm({
+      ownerName: currentUser?.ownerName ?? "",
+      businessName: currentUser?.businessName ?? "",
+      businessType: currentUser?.businessType ?? BUSINESS_TYPES[0],
+    });
+  }, [currentUser?.ownerName, currentUser?.businessName, currentUser?.businessType]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -23,6 +31,40 @@ export function SettingsView({ currentUser, setCurrentUser, onLogout }) {
   const [inviting, setInviting] = useState(false);
 
   const isAdmin = (currentUser?.role || "admin").toLowerCase() === "admin";
+
+  // Invitations addressed to me (pending ones to accept, accepted ones I can leave)
+  const [invitations, setInvitations] = useState([]);
+  const [invBusy, setInvBusy] = useState(null);
+
+  const fetchInvitations = useCallback(async () => {
+    try {
+      setInvitations(await api.auth.invitations());
+    } catch (err) {
+      console.error("Failed to load invitations:", err.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInvitations();
+  }, [fetchInvitations]);
+
+  const handleInvitation = async (inv, action) => {
+    if (action === "leave" && !window.confirm(
+      inv.status === "pending"
+        ? `Decline the invitation from ${inv.businessName}?`
+        : `Leave ${inv.businessName}? You will lose access to its data until invited again.`
+    )) return;
+    setInvBusy(inv.id);
+    try {
+      const res = action === "accept" ? await api.auth.acceptInvite(inv.id) : await api.auth.leaveInvite(inv.id);
+      setCurrentUser(res.user);
+      await Promise.all([fetchInvitations(), onWorkspaceChange?.()]);
+    } catch (err) {
+      alert(err.message || "Could not update invitation.");
+    } finally {
+      setInvBusy(null);
+    }
+  };
 
   const fetchMembers = useCallback(async () => {
     if (!isAdmin) return;
@@ -68,11 +110,11 @@ export function SettingsView({ currentUser, setCurrentUser, onLogout }) {
     setInviting(true);
     try {
       await api.auth.inviteMember({ email: inviteEmail.trim(), role: inviteRole });
-      setInviteSuccess(`Partner ${inviteEmail} invited with '${inviteRole.toUpperCase()}' role.`);
+      setInviteSuccess(`Invitation sent to ${inviteEmail} (${inviteRole.toUpperCase()}). They get access after they sign in and accept it under Settings.`);
       setInviteEmail("");
       setInviteRole("view");
       await fetchMembers();
-      setTimeout(() => setInviteSuccess(""), 3000);
+      setTimeout(() => setInviteSuccess(""), 6000);
     } catch (err) {
       setInviteError(err.message || "Failed to invite partner.");
     } finally {
@@ -230,14 +272,14 @@ export function SettingsView({ currentUser, setCurrentUser, onLogout }) {
                   style={{ width: "100%", justifyContent: "center" }}
                 >
                   <UserPlus size={15} />
-                  {inviting ? "Granting Access..." : "Invite Partner"}
+                  {inviting ? "Sending Invite..." : "Invite Partner"}
                 </button>
               </form>
 
               {/* Members List */}
               <div style={{ borderTop: "1px solid #E2E8F0", paddingTop: 14 }}>
                 <p style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ink-soft)", marginBottom: 10 }}>
-                  Active Workspace Partners ({members.length})
+                  Workspace Partners ({members.length})
                 </p>
 
                 {membersLoading ? (
@@ -252,7 +294,8 @@ export function SettingsView({ currentUser, setCurrentUser, onLogout }) {
                       <div>
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{m.email}</p>
                         <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "var(--ink-soft)" }}>
-                          Added {m.created_at?.slice(0, 10)}
+                          {m.status === "pending" ? "Invited" : "Joined"} {m.created_at?.slice(0, 10)}
+                          {m.status === "pending" && <span className="bc-tag" style={{ marginLeft: 6, fontSize: 10, padding: "1px 6px" }}>Pending</span>}
                         </p>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -288,6 +331,36 @@ export function SettingsView({ currentUser, setCurrentUser, onLogout }) {
           )}
         </div>
       </div>
+
+      {invitations.length > 0 && (
+        <div className="bc-card" style={{ marginTop: 20 }}>
+          <h2 className="bc-section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Mail size={18} /> Workspace Invitations
+          </h2>
+          {invitations.map((inv) => (
+            <div key={inv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap", padding: "8px 0", borderBottom: "1px solid #F1F5F9" }}>
+              <div>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+                  {inv.businessName || "A business"}
+                </p>
+                <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "var(--ink-soft)" }}>
+                  {inv.ownerName ? `From ${inv.ownerName} · ` : ""}{inv.role.toUpperCase()} access · {inv.status === "pending" ? "Pending" : "Joined"}
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {inv.status === "pending" && (
+                  <button className="bc-btn bc-btn-primary bc-btn-sm" disabled={invBusy === inv.id} onClick={() => handleInvitation(inv, "accept")}>
+                    Accept
+                  </button>
+                )}
+                <button className="bc-btn bc-btn-ghost bc-btn-sm" disabled={invBusy === inv.id} onClick={() => handleInvitation(inv, "leave")}>
+                  {inv.status === "pending" ? "Decline" : "Leave"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

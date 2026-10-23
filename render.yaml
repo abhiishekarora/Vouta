@@ -1,39 +1,61 @@
 services:
   # ─── Backend Service (Free Web Service) ───────────────────────────
+  # Secrets use `sync: false`: set their values in the Render dashboard, never in this file.
   - type: web
     name: vouta-backend
     env: node
     plan: free
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm ci && npm run migrate
     startCommand: node src/server.js
+    healthCheckPath: /health
     envVars:
       - key: PORT
         value: 10000
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: postgresql://neondb_owner:npg_q9xjJBHo3FpM@ep-snowy-scene-azhbnqs8-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=verify-full
+        sync: false
       - key: DATABASE_URL_UNPOOLED
-        value: postgresql://neondb_owner:npg_q9xjJBHo3FpM@ep-snowy-scene-azhbnqs8.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=verify-full
+        sync: false
       - key: JWT_SECRET
-        value: 00a659ca0fda44eb79130032f81bf750850a0a7b347175b9834bbd1afe75a327d68f60ee9ccf5ad42e4a040c103606dbeb3e6e3f360de26c91b9429d29484ee6
+        sync: false
       - key: JWT_EXPIRES_IN
         value: 7d
       - key: CORS_ORIGIN
-        value: https://vouta-frontend.onrender.com,http://localhost:3000
+        value: https://vouta-frontend.onrender.com
 
   # ─── Frontend Static Site (Always Free) ──────────────────────────
   - type: web
     name: vouta-frontend
     env: static
     rootDir: frontend
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run build
     staticPublishPath: dist
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
+    # Render static sites ignore public/_headers; headers must be declared here.
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://vouta-backend.onrender.com; frame-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
     envVars:
       - key: VITE_API_URL
         value: https://vouta-backend.onrender.com

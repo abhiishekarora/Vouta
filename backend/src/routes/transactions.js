@@ -2,16 +2,17 @@ const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
 const { authenticate, requireRole } = require("../middleware/auth");
-const { validate } = require("../middleware/validate");
+const { validate, amount, isoDate, uuidParam } = require("../middleware/validate");
 
 const router = express.Router();
 router.use(authenticate);
+router.param("id", uuidParam);
 
 const txSchema = z.object({
   type: z.enum(["income", "expense"]),
-  amount: z.coerce.number().positive("Amount must be positive."),
+  amount: amount.positive("Amount must be positive."),
   category: z.string().min(1).max(100).trim(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format."),
+  date: isoDate,
   note: z.string().max(500).trim().default(""),
 });
 

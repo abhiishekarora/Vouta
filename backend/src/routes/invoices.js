@@ -2,17 +2,19 @@ const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
 const { authenticate, requireRole } = require("../middleware/auth");
-const { validate } = require("../middleware/validate");
+const { validate, isoDate, amount, uuidParam } = require("../middleware/validate");
+const { sendStoredFile } = require("../utils/files");
 
 const router = express.Router();
 router.use(authenticate);
+router.param("id", uuidParam);
 
 const invoiceSchema = z.object({
   invoiceNo: z.string().min(1).max(60).trim(),
   client:    z.string().min(1).max(200).trim(),
-  amount:    z.coerce.number().positive("Amount must be positive."),
-  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  dueDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  amount:    amount.positive("Amount must be positive."),
+  issueDate: isoDate,
+  dueDate:   isoDate.optional().nullable(),
   status:    z.enum(["draft", "sent", "paid", "overdue"]).default("draft"),
   note:      z.string().max(500).trim().default(""),
 });
@@ -90,13 +92,7 @@ router.delete("/:id", requireRole(["admin", "edit"]), async (req, res) => {
 });
 
 // POST /api/invoices/:id/upload — attach a PDF/JPG/PNG file to an invoice
-router.post("/:id/upload", requireRole(["admin", "edit"]), (req, res, next) => {
-  const limiter = req.app.get("uploadLimiter");
-  limiter(req, res, () => {
-    const upload = req.app.get("upload");
-    upload.single("file")(req, res, next);
-  });
-}, async (req, res) => {
+router.post("/:id/upload", requireRole(["admin", "edit"]), (req, res, next) => req.app.get("singleFileUpload")(req, res, next), async (req, res) => {
   const ownerId = req.user.effectiveUserId || req.user.id;
 
   if (!req.file) {
@@ -134,11 +130,7 @@ router.get("/:id/file", async (req, res) => {
     if (!rows[0] || !rows[0].file_data) {
       return res.status(404).json({ error: "No file attached to this invoice." });
     }
-    const { file_data, file_name, file_mime } = rows[0];
-    res.setHeader("Content-Type", file_mime);
-    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(file_name)}"`);
-    res.setHeader("Content-Length", file_data.length);
-    return res.send(file_data);
+    return sendStoredFile(res, rows[0]);
   } catch (err) {
     console.error("[Invoices] File download error:", err.message);
     return res.status(500).json({ error: "Failed to retrieve file." });
