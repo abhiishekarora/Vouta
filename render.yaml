@@ -24,6 +24,13 @@ services:
         value: 7d
       - key: CORS_ORIGIN
         value: https://vouta-frontend.onrender.com
+      # Password-reset emails (Resend). APP_URL is where the emailed link points.
+      - key: APP_URL
+        value: https://vouta-frontend.onrender.com
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
 
   # ─── Frontend Static Site (Always Free) ──────────────────────────
   - type: web

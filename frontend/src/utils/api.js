@@ -97,7 +97,7 @@ async function request(method, path, body) {
   if (!res.ok) {
     let defaultMsg = `Request failed (${res.status})`;
     if (res.status === 401) {
-      if (path === "/auth/login") {
+      if (path === "/auth/login" || path === "/auth/register") {
         defaultMsg = "Invalid email or password.";
       } else {
         defaultMsg = "Session expired. Please sign in.";
@@ -210,6 +210,8 @@ export const auth = {
   register:     (data) => post("/auth/register", data),
   login:        (data) => post("/auth/login", data),
   logout:       ()     => post("/auth/logout"),
+  forgotPassword: (email)           => post("/auth/forgot-password", { email }),
+  resetPassword:  (token, password) => post("/auth/reset-password", { token, password }),
   me:           ()     => get("/auth/me"),
   profile:      (data) => patch("/auth/profile", data),
   getMembers:   ()     => get("/auth/members"),

@@ -65,6 +65,8 @@ Frontend automatically proxies all `/api/*` requests to `http://localhost:4000`.
 | `POST` | `/api/auth/login` | ✗ | Login, returns JWT |
 | `GET`  | `/api/auth/me` | ✓ | Current user profile |
 | `PATCH`| `/api/auth/profile` | ✓ | Update profile |
+| `POST` | `/api/auth/forgot-password` | ✗ | Email a password-reset link |
+| `POST` | `/api/auth/reset-password` | ✗ | Set a new password with the emailed token |
 | `GET/POST/PATCH/DELETE` | `/api/goals` | ✓ | Goals CRUD |
 | `GET/POST/DELETE` | `/api/transactions` | ✓ | Ledger CRUD |
 | `GET/POST/DELETE` | `/api/invoices` | ✓ | Invoices CRUD |
@@ -82,6 +84,24 @@ Frontend automatically proxies all `/api/*` requests to `http://localhost:4000`.
 
 ---
 
+## Password Reset Emails
+
+"Forgot password?" on the sign-in screen emails a single-use link that expires in 30 minutes.
+Using it sets the new password and signs the account out of every device.
+
+Emails are sent through [Resend](https://resend.com) (HTTP API, free tier 3,000 emails/month):
+
+1. Create a Resend account, add and verify your sending domain (DNS records).
+2. Create an API key.
+3. Set on the backend (`backend/.env` locally, Render dashboard in production):
+   - `RESEND_API_KEY` — the API key
+   - `MAIL_FROM` — e.g. `Vouta <no-reply@yourdomain.in>` (must be on the verified domain)
+   - `APP_URL` — the frontend URL the link should open, e.g. `https://vouta-frontend.onrender.com`
+
+In development with no `RESEND_API_KEY`, the email (including the link) is printed to the backend console instead.
+
+---
+
 ## Security Features
 
 - **bcrypt** (cost 12) for password hashing — never MD5/SHA
@@ -89,7 +109,10 @@ Frontend automatically proxies all `/api/*` requests to `http://localhost:4000`.
 - **Constant-time** password comparison (prevents timing attacks)
 - **Helmet** security headers on all responses
 - **CORS** restricted to explicit origin allowlist
-- **Rate limiting** — 10 auth req/15 min, 120 global req/min per IP
+- **Rate limiting** — 10 failed logins/15 min per account, 100 per IP; 300 global req/min per IP;
+  5 reset emails/hour per address
+- **Password reset tokens** stored only as SHA-256 hashes; single use, 30-minute expiry;
+  a reset invalidates all existing sessions
 - **Zod** schema validation on all request bodies
 - **User-scoped queries** — every DB query filters by `user_id` (prevents IDOR)
 - **Parameterized SQL** — no string interpolation, zero SQL injection risk

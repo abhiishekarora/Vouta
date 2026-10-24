@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import "./styles/global.css";
 import { useConsoleData, useAuthState } from "./utils/storage";
 import { auth, token as tokenStore } from "./utils/api";
-import { Auth } from "./components/Auth";
+import { Auth, ResetPassword } from "./components/Auth";
 import { Sidebar } from "./components/Sidebar";
 import { Dashboard } from "./components/Dashboard";
 import { GoalsView } from "./components/GoalsView";
@@ -86,6 +86,39 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // Emailed reset link: /reset-password?token=… (null when not on that page)
+  const [resetToken, setResetToken] = useState(() =>
+    window.location.pathname === "/reset-password"
+      ? new URLSearchParams(window.location.search).get("token") || ""
+      : null
+  );
+  const [authNotice, setAuthNotice] = useState("");
+
+  useEffect(() => {
+    // Drop the token from the address bar and history once it has been read.
+    if (resetToken !== null) window.history.replaceState(null, "", "/");
+  }, [resetToken]);
+
+  if (resetToken !== null) {
+    return (
+      <>
+        <Toaster />
+        <ResetPassword
+          token={resetToken}
+          onDone={(message) => {
+            // A reset signs out every session, including any in this browser.
+            if (message) {
+              auth.logout().catch(() => {});
+              setCurrentUser(null);
+            }
+            setAuthNotice(message);
+            setResetToken(null);
+          }}
+        />
+      </>
+    );
+  }
+
   if (authLoading) {
     return (
       <div className="bc-auth-page">
@@ -101,6 +134,7 @@ export default function App() {
       <>
       <Toaster />
       <Auth
+        notice={authNotice}
         onLoginSuccess={(user) => {
           setCurrentUser(user);
         }}
