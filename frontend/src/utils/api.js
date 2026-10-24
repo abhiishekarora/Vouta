@@ -101,6 +101,8 @@ async function request(method, path, body) {
         defaultMsg = "Invalid email or password.";
       } else {
         defaultMsg = "Session expired. Please sign in.";
+        // Session died mid-use (expired token, deleted account): useAuthState signs the user out.
+        window.dispatchEvent(new Event("vouta:unauthorized"));
       }
     }
 
@@ -157,33 +159,45 @@ async function uploadFile(path, file) {
 async function downloadFile(path) {
   const headers = getHeaders();
 
-  let res;
+  // Open the tab synchronously, inside the click, then fill it once the file arrives.
+  // window.open() after an await is treated as an unsolicited popup and blocked (Safari, mobile).
+  const tab = window.open("", "_blank");
+  if (tab) tab.opener = null;
+
   try {
-    res = await fetch(`${BASE_URL}${path}`, {
-      method: "GET",
-      credentials: "include",
-      headers,
-    });
-  } catch (netErr) {
-    throw new Error("Network error during download.");
+    let res;
+    try {
+      res = await fetch(`${BASE_URL}${path}`, {
+        method: "GET",
+        credentials: "include",
+        headers,
+      });
+    } catch (netErr) {
+      throw new Error("Network error during download.");
+    }
+
+    if (res.status === 401) {
+      window.dispatchEvent(new Event("vouta:unauthorized"));
+      throw new Error("Session expired. Please sign in.");
+    }
+
+    if (!res.ok) {
+      throw new Error(`Could not retrieve file (${res.status})`);
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+
+    // Show in the new tab so PDF viewers and image viewers can render inline
+    if (tab) tab.location.href = url;
+    else window.location.assign(url);
+
+    // Clean up the object URL after a short delay
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    tab?.close();
+    throw err;
   }
-
-  if (res.status === 401) {
-    throw new Error("Session expired. Please sign in.");
-  }
-
-  if (!res.ok) {
-    throw new Error(`Could not retrieve file (${res.status})`);
-  }
-
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-
-  // Open in a new tab so PDF viewers and image viewers can render inline
-  window.open(url, "_blank", "noopener,noreferrer");
-
-  // Clean up the object URL after a short delay
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 const get   = (path)       => request("GET",    path);
@@ -202,6 +216,9 @@ export const auth = {
   inviteMember: (data) => post("/auth/invite", data),
   updateRole:   (id, role) => patch(`/auth/members/${id}/role`, { role }),
   removeMember: (id)   => del(`/auth/members/${id}`),
+  invitations:  ()     => get("/auth/invitations"),
+  acceptInvite: (id)   => post(`/auth/invitations/${id}/accept`),
+  leaveInvite:  (id)   => del(`/auth/invitations/${id}`),
 };
 
 // Goals

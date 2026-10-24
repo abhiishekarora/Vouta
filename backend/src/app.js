@@ -18,90 +18,110 @@ const projectsRoutes     = require("./routes/projects");
 const projectTasksRoutes = require("./routes/projectTasks");
 const documentsRoutes    = require("./routes/documents");
 
-const { testConnection } = require("./config/db");
-testConnection().catch((err) => console.error("[DB] Migration error on boot:", err));
-
 const app = express();
+app.disable("x-powered-by");
 
 // ─── Multer — in-memory file storage ─────────────────────────────
-// Accepted MIME types for uploaded files
-const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png"];
 const FILE_SIZE_LIMIT = 5 * 1024 * 1024; // 5 MB
+
+// The browser-declared MIME type is attacker-controlled, so uploads are accepted only if
+// the file's leading bytes match a real PDF / JPEG / PNG. Returns the verified MIME or null.
+function sniffMime(buf) {
+  if (buf.length >= 5 && buf.subarray(0, 5).toString("latin1") === "%PDF-") return "application/pdf";
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  if (buf.length >= 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  return null;
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: FILE_SIZE_LIMIT },
-  fileFilter: (_req, file, cb) => {
-    if (ALLOWED_MIME.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE", "Only PDF, JPEG, and PNG files are allowed."));
-    }
-  },
+  limits: { fileSize: FILE_SIZE_LIMIT, files: 1, fields: 5 },
 });
 
-// Export multer instance so route files can use it
-app.set("upload", upload);
+function badRequest(message) {
+  return Object.assign(new Error(message), { status: 400, expose: true });
+}
+
+/**
+ * Upload pipeline shared by documents and invoices: rate limit, parse a single "file" field,
+ * then verify content and normalise the filename. Sets req.file.mimetype to the sniffed type.
+ */
+function singleFileUpload(req, res, next) {
+  uploadLimiter(req, res, (limitErr) => {
+    if (limitErr) return next(limitErr);
+    upload.single("file")(req, res, (err) => {
+      if (err) return next(err);
+      if (!req.file) return next(badRequest("No file provided. Please attach a PDF, JPG, or PNG file."));
+      const mime = sniffMime(req.file.buffer);
+      if (!mime) return next(badRequest("Only PDF, JPEG, and PNG files are allowed."));
+      req.file.mimetype = mime;
+      // Strip path parts and control/quote characters; they are echoed in headers and the UI.
+      req.file.originalname = (req.file.originalname || "file")
+        .split(/[\\/]/).pop()
+        .replace(/[\u0000-\u001f\u007f"]/g, "")
+        .slice(0, 200) || "file";
+      next();
+    });
+  });
+}
+app.set("singleFileUpload", singleFileUpload);
 
 // ─── Security Headers (helmet) ────────────────────────────────────
+// JSON API: default helmet CSP is fine; stored files get their own sandbox CSP (utils/files.js).
 app.use(helmet({
-  contentSecurityPolicy: false,
   crossOriginResourcePolicy: { policy: "cross-origin" },
 }));
 
 // ─── CORS ─────────────────────────────────────────────────────────
 // CORS_ORIGIN is a comma-separated list of allowed origins.
-// In production on Vercel, set this to your frontend Vercel URL.
 const allowedOrigins = (process.env.CORS_ORIGIN || "http://localhost:3000")
   .split(",")
-  .map((o) => o.trim());
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow no-origin requests (curl, Postman, server-to-server)
     if (!origin) return callback(null, true);
 
-    // Exact match against the explicit allowlist only.
-    // NOTE: The *.vercel.app wildcard has been intentionally removed —
-    // it is unsafe to auto-approve unknown origins when credentials:true
-    // because any Vercel-hosted page could make authenticated requests.
+    // Exact match against the explicit allowlist only. Rejecting here (before any route runs)
+    // is also what blocks cross-site form posts that would otherwise ride the SameSite=None cookie.
     if (allowedOrigins.includes(origin)) return callback(null, true);
 
-    callback(new Error(`CORS: Origin '${origin}' not allowed.`));
+    callback(Object.assign(new Error("Origin not allowed."), { status: 403, expose: true }));
   },
   credentials: true,
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  maxAge: 600,
 }));
 
 // ─── Body parsing ─────────────────────────────────────────────────
+// JSON only: no urlencoded parser, so HTML forms on other sites cannot produce a valid body.
 app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 app.use(cookieParser());
 
-// ─── Global rate limiter: 120 req/min per IP ─────────────────────
-// Trust Vercel's proxy layer for accurate IP detection
+// ─── Global rate limiter: 300 req/min per IP ─────────────────────
+// Generous because many users share one public IP (mobile carrier NAT, office networks)
+// and every page load fires ~9 requests.
+// Render puts exactly one proxy in front of the app.
 app.set("trust proxy", 1);
 app.use(rateLimit({
   windowMs: 60 * 1000,
-  max: 120,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests. Please slow down." },
 }));
 
-
-// ─── Upload-specific rate limiter: 5 uploads / min per IP ────────
+// ─── Upload-specific rate limiter: 10 uploads / min per IP ───────
 const uploadLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 5,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many file uploads. Please wait a minute before trying again." },
 });
-
-// Export upload limiter for use in routes
-app.set("uploadLimiter", uploadLimiter);
 
 // ─── Health check ─────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
@@ -109,7 +129,7 @@ app.get("/health", (_req, res) => {
 });
 
 // ─── API Routes ───────────────────────────────────────────────────
-app.use("/api/auth",          authRoutes);  // authLimiter is scoped per-route inside routes/auth.js
+app.use("/api/auth",          authRoutes);  // auth limiters are scoped per-route inside routes/auth.js
 app.use("/api/goals",         goalsRoutes);
 app.use("/api/transactions",  transactionsRoutes);
 app.use("/api/invoices",      invoicesRoutes);
@@ -125,7 +145,7 @@ app.use((err, req, res, next) => {
     if (err.code === "LIMIT_FILE_SIZE") {
       return res.status(413).json({ error: "File too large. Maximum size is 5MB." });
     }
-    return res.status(400).json({ error: err.message || "File upload error." });
+    return res.status(400).json({ error: "Upload a single file in the 'file' field." });
   }
   next(err);
 });
@@ -137,16 +157,17 @@ app.use((_req, res) => {
 
 // ─── Global error handler ─────────────────────────────────────────
 app.use((err, _req, res, _next) => {
-  console.error("[Server] Unhandled error:", err.message);
-  const status = err.status || 500;
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) console.error("[Server] Unhandled error:", err.stack || err.message);
+  // Client errors (bad JSON, body too large, CORS) are safe to explain; server errors are not.
   const message =
-    process.env.NODE_ENV === "production"
-      ? "An internal server error occurred."
-      : err.message;
+    status < 500 && err.expose !== false
+      ? err.message
+      : process.env.NODE_ENV === "production" ? "An internal server error occurred." : err.message;
   res.status(status).json({ error: message });
 });
 
-// ─── Export for Vercel serverless ─────────────────────────────────
-// Vercel imports this module and handles connections itself.
-// Local dev uses server.js which calls app.listen().
+// ─── Export ───────────────────────────────────────────────────────
+// server.js calls app.listen(); serverless hosts can import this module directly.
 module.exports = app;
+module.exports.sniffMime = sniffMime;

@@ -3,6 +3,7 @@ import { Plus, Trash2, Check, Eye } from "lucide-react";
 import { Modal, EmptyState } from "./Modal";
 import { todayISO, PRIORITY_COLORS } from "../utils/helpers";
 import * as api from "../utils/api";
+import { notify } from "../utils/toast";
 
 export function TodosView({ data, refetch, userRole = "admin" }) {
   const [showModal, setShowModal] = useState(false);
@@ -12,7 +13,7 @@ export function TodosView({ data, refetch, userRole = "admin" }) {
   const canEdit = userRole !== "view";
 
   const addTodo = async () => {
-    if (!form.text.trim()) return;
+    if (!form.text.trim()) return notify("Please describe the task.");
     setSaving(true);
     try {
       await api.todos.create({ text: form.text.trim(), priority: form.priority, dueDate: form.dueDate || null });

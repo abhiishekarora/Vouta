@@ -1,5 +1,6 @@
 require("dotenv").config();
 const { Pool } = require("pg");
+const { sslFor } = require("./config/db");
 const fs = require("fs");
 const path = require("path");
 
@@ -16,7 +17,7 @@ if (!connStr) {
 
 const pool = new Pool({
   connectionString: connStr,
-  ssl: { rejectUnauthorized: false },
+  ssl: sslFor(connStr),
   max: 1,
   connectionTimeoutMillis: 15000,
 });

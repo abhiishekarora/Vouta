@@ -3,6 +3,7 @@ import { Plus, Trash2, ChevronRight, Archive, Eye } from "lucide-react";
 import { Modal, EmptyState } from "./Modal";
 import { PROJECT_STATUSES } from "../utils/helpers";
 import * as api from "../utils/api";
+import { notify } from "../utils/toast";
 
 const KANBAN_COLS = ["To Do", "In Progress", "Done"];
 
@@ -20,7 +21,7 @@ export function ProjectsView({ data, refetch, userRole = "admin" }) {
   const tasksForProject = data.projectTasks.filter((t) => t.projectId === selectedProjectId);
 
   const addProject = async () => {
-    if (!projectForm.name.trim()) return;
+    if (!projectForm.name.trim()) return notify("Please enter a project name.");
     setSaving(true);
     try {
       await api.projects.create({ ...projectForm, startDate: projectForm.startDate || null });
@@ -33,6 +34,7 @@ export function ProjectsView({ data, refetch, userRole = "admin" }) {
   };
 
   const removeProject = async (id) => {
+    if (!window.confirm("Delete this project and all of its tasks? This cannot be undone.")) return;
     await api.projects.remove(id);
     if (selectedProjectId === id) setSelectedProjectId(null);
     await refetch();
@@ -44,7 +46,7 @@ export function ProjectsView({ data, refetch, userRole = "admin" }) {
   };
 
   const addTask = async () => {
-    if (!taskForm.title.trim() || !selectedProjectId) return;
+    if (!taskForm.title.trim() || !selectedProjectId) return notify("Please enter a task title.");
     setSaving(true);
     try {
       await api.projectTasks.create({
@@ -94,9 +96,9 @@ export function ProjectsView({ data, refetch, userRole = "admin" }) {
           <EmptyState title="No projects" body="Create a project and track tasks with the Kanban board." />
         </div>
       ) : (
-        <div style={{ display: "flex", gap: 20 }}>
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
           {/* Project list */}
-          <div style={{ width: 280, flexShrink: 0 }}>
+          <div style={{ flex: "1 1 260px", maxWidth: 320 }}>
             {data.projects.map((p) => (
               <div
                 key={p.id}
@@ -145,7 +147,7 @@ export function ProjectsView({ data, refetch, userRole = "admin" }) {
 
           {/* Kanban board */}
           {selectedProject && (
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: "999 1 320px", minWidth: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                 <h2 style={{ margin: 0, fontSize: 20, color: "var(--ink)" }}>{selectedProject.name}</h2>
                 {canEdit && (
@@ -154,7 +156,7 @@ export function ProjectsView({ data, refetch, userRole = "admin" }) {
                   </button>
                 )}
               </div>
-              <div style={{ display: "flex", gap: 14 }}>
+              <div style={{ display: "flex", gap: 14, overflowX: "auto" }}>
                 {KANBAN_COLS.map((col) => (
                   <div key={col} className="bc-kanban-col">
                     <p className="bc-kanban-col-title">{col}</p>

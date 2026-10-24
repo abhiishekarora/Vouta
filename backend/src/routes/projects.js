@@ -2,15 +2,16 @@ const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
 const { authenticate, requireRole } = require("../middleware/auth");
-const { validate } = require("../middleware/validate");
+const { validate, isoDate, uuidParam } = require("../middleware/validate");
 
 const router = express.Router();
 router.use(authenticate);
+router.param("id", uuidParam);
 
 const projectSchema = z.object({
   name:        z.string().min(1, "Project name is required.").max(200).trim(),
   label:       z.string().max(50).trim().default("Internal"),
-  startDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  startDate:   isoDate.optional().nullable(),
   status:      z.enum(["Not Started", "Active", "Blocked", "Completed"]).default("Not Started"),
   description: z.string().max(1000).trim().default(""),
 });

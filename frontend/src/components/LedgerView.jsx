@@ -4,6 +4,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recha
 import { Modal, StatCard, EmptyState } from "./Modal";
 import { INR, todayISO, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "../utils/helpers";
 import * as api from "../utils/api";
+import { notify } from "../utils/toast";
 
 const PIE_COLORS = ["#8B5CF6", "#3B82F6", "#10B981", "#F59E0B", "#6366F1", "#EC4899", "#14B8A6"];
 
@@ -18,7 +19,8 @@ export function LedgerView({ data, refetch, userRole = "admin" }) {
   const canEdit = userRole !== "view";
 
   const addTx = async () => {
-    if (!form.amount || !form.category) return;
+    if (!(Number(form.amount) > 0)) return notify("Enter an amount greater than 0.");
+    if (!form.date) return notify("Please pick a date.");
     setSaving(true);
     try {
       await api.transactions.create({ ...form, amount: Number(form.amount) });
@@ -31,6 +33,7 @@ export function LedgerView({ data, refetch, userRole = "admin" }) {
   };
 
   const removeTx = async (id) => {
+    if (!window.confirm("Delete this ledger entry? This cannot be undone.")) return;
     await api.transactions.remove(id);
     await refetch();
   };
@@ -110,9 +113,9 @@ export function LedgerView({ data, refetch, userRole = "admin" }) {
 
       <div className="bc-tab-list">
         {["all", "income", "expense"].map((f) => (
-          <span key={f} className={"bc-filter-chip" + (filter === f ? " active" : "")} onClick={() => setFilter(f)}>
+          <button type="button" key={f} className={"bc-filter-chip" + (filter === f ? " active" : "")} onClick={() => setFilter(f)}>
             {f === "all" ? "All Entries" : f === "income" ? "Income Only" : "Expenses Only"}
-          </span>
+          </button>
         ))}
       </div>
 

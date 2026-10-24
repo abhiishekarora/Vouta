@@ -2,10 +2,11 @@ const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
 const { authenticate, requireRole } = require("../middleware/auth");
-const { validate } = require("../middleware/validate");
+const { validate, uuidParam, UUID_RE } = require("../middleware/validate");
 
 const router = express.Router();
 router.use(authenticate);
+router.param("id", uuidParam);
 
 const taskSchema = z.object({
   projectId:  z.string().uuid("Invalid project ID."),
@@ -26,6 +27,7 @@ router.get("/", async (req, res) => {
     const params = [ownerId];
 
     if (req.query.projectId) {
+      if (!UUID_RE.test(String(req.query.projectId))) return res.json([]);
       params.push(req.query.projectId);
       query += ` AND project_id = $${params.length}`;
     }
@@ -51,6 +53,15 @@ router.post("/", requireRole(["admin", "edit"]), validate(taskSchema), async (re
     );
     if (!proj.rows[0]) {
       return res.status(404).json({ error: "Project not found or access denied." });
+    }
+    if (assignedTo) {
+      const member = await pool.query(
+        "SELECT id FROM team_members WHERE user_id = $1 AND id = $2",
+        [ownerId, assignedTo]
+      );
+      if (!member.rows[0]) {
+        return res.status(400).json({ error: "Assignee is not a member of this team." });
+      }
     }
 
     const { rows } = await pool.query(

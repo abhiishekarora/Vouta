@@ -3,6 +3,7 @@ import { Plus, Trash2, UserCheck, UserX, Eye } from "lucide-react";
 import { Modal, EmptyState } from "./Modal";
 import { DEPARTMENTS } from "../utils/helpers";
 import * as api from "../utils/api";
+import { notify } from "../utils/toast";
 
 function initials(name) {
   return name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
@@ -16,7 +17,7 @@ export function TeamView({ data, refetch, userRole = "admin" }) {
   const canEdit = userRole !== "view";
 
   const addMember = async () => {
-    if (!form.name.trim() || !form.email.trim()) return;
+    if (!form.name.trim() || !form.email.trim()) return notify("Name and email are required.");
     setSaving(true);
     try {
       await api.team.create({ ...form, capacity: Number(form.capacity) || 40 });
@@ -36,6 +37,7 @@ export function TeamView({ data, refetch, userRole = "admin" }) {
 
   const removeMember = async (id) => {
     if (!canEdit) return;
+    if (!window.confirm("Remove this team member? Their task assignments will be cleared.")) return;
     await api.team.remove(id);
     await refetch();
   };

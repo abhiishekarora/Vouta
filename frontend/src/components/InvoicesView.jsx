@@ -3,6 +3,7 @@ import { Plus, Trash2, FileText, Clock, CheckCircle2, Eye, Paperclip, Download, 
 import { Modal, EmptyState } from "./Modal";
 import { INR, todayISO } from "../utils/helpers";
 import * as api from "../utils/api";
+import { notify } from "../utils/toast";
 
 const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 const MAX_SIZE_MB = 5;
@@ -22,7 +23,9 @@ export function InvoicesView({ data, refetch, userRole = "admin" }) {
   const canEdit = userRole !== "view";
 
   const addInvoice = async () => {
-    if (!form.invoiceNo.trim() || !form.client.trim() || !form.amount) return;
+    if (!form.invoiceNo.trim() || !form.client.trim()) return notify("Invoice number and client are required.");
+    if (!(Number(form.amount) > 0)) return notify("Enter an amount greater than 0.");
+    if (!form.issueDate) return notify("Please pick an issue date.");
     setSaving(true);
     setFileError("");
     try {
@@ -33,7 +36,7 @@ export function InvoicesView({ data, refetch, userRole = "admin" }) {
         try {
           await api.invoices.upload(inv.id, selectedFile);
         } catch (uploadErr) {
-          setFileError(`Invoice saved, but file upload failed: ${uploadErr.message}`);
+          notify(`Invoice saved, but file upload failed: ${uploadErr.message}`);
         }
       }
 
@@ -52,6 +55,7 @@ export function InvoicesView({ data, refetch, userRole = "admin" }) {
   };
 
   const removeInvoice = async (id) => {
+    if (!window.confirm("Delete this invoice and its attached file? This cannot be undone.")) return;
     await api.invoices.remove(id);
     await refetch();
   };

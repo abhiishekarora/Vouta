@@ -2,10 +2,11 @@ const express = require("express");
 const { z } = require("zod");
 const { pool } = require("../config/db");
 const { authenticate, requireRole } = require("../middleware/auth");
-const { validate } = require("../middleware/validate");
+const { validate, uuidParam } = require("../middleware/validate");
 
 const router = express.Router();
 router.use(authenticate);
+router.param("id", uuidParam);
 
 const memberSchema = z.object({
   name:       z.string().min(1, "Name is required.").max(120).trim(),

@@ -4,45 +4,54 @@ const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 const { z } = require("zod");
 const { pool } = require("../config/db");
-const { validate } = require("../middleware/validate");
-const { authenticate, requireRole } = require("../middleware/auth");
+const { validate, uuidParam } = require("../middleware/validate");
+const { authenticate, requireRole, resolveWorkspace } = require("../middleware/auth");
 
-// ─── Auth-specific rate limiter (login + register only) ───────────
+// ─── Auth-specific rate limiters (login + register only) ──────────
 // Applied directly to the write routes so that GET /auth/me (which fires
-// on every page load without a cookie) does NOT consume the budget.
-const authLimiter = rateLimit({
+// on every page load) does NOT consume the budget.
+// Two layers: a strict per-account limit stops password guessing on one account,
+// and a looser per-IP limit stops spraying many accounts — loose enough that users
+// behind a shared IP (mobile carrier NAT, office networks) don't lock each other out.
+const limiterDefaults = {
   windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many attempts. Please try again in 15 minutes." },
   skipSuccessfulRequests: true,
+};
+const authIpLimiter = rateLimit({ ...limiterDefaults, max: 100 });
+const authAccountLimiter = rateLimit({
+  ...limiterDefaults,
+  max: 10,
+  keyGenerator: (req) => `acct:${String(req.body?.email || "").toLowerCase().trim()}`,
 });
 
 const router = express.Router();
+router.param("id", uuidParam);
 
 // ─── Zod Schemas ──────────────────────────────────────────────────
 const registerSchema = z.object({
-  email: z.string().email("Invalid email address.").toLowerCase(),
-  password: z.string().min(8, "Password must be at least 8 characters."),
-  ownerName: z.string().min(1, "Owner name is required.").max(120).trim(),
-  businessName: z.string().min(1, "Business name is required.").max(200).trim(),
+  email: z.string().trim().email("Invalid email address.").max(254).toLowerCase(),
+  password: z.string().min(8, "Password must be at least 8 characters.").max(128, "Password is too long."),
+  ownerName: z.string().trim().min(1, "Owner name is required.").max(120),
+  businessName: z.string().trim().min(1, "Business name is required.").max(200),
   businessType: z.string().max(100).trim().default("Other"),
 });
 
 const loginSchema = z.object({
-  email: z.string().email().toLowerCase(),
-  password: z.string().min(1, "Password is required."),
+  email: z.string().trim().email("Invalid email address.").max(254).toLowerCase(),
+  password: z.string().min(1, "Password is required.").max(128),
 });
 
 const profileSchema = z.object({
-  ownerName: z.string().min(1).max(120).trim().optional(),
-  businessName: z.string().min(1).max(200).trim().optional(),
+  ownerName: z.string().trim().min(1).max(120).optional(),
+  businessName: z.string().trim().min(1).max(200).optional(),
   businessType: z.string().max(100).trim().optional(),
 });
 
 const inviteSchema = z.object({
-  email: z.string().email("Invalid email.").toLowerCase(),
+  email: z.string().trim().email("Invalid email.").max(254).toLowerCase(),
   role: z.enum(["view", "edit", "admin"]).default("view"),
 });
 
@@ -62,57 +71,65 @@ function cookieMaxAgeMs() {
 }
 
 /**
- * Set the JWT as an httpOnly, Secure cookie.
- *
- * Security properties:
- *  - httpOnly: JS on the page cannot read this cookie — XSS cannot exfiltrate the token.
- *  - secure:   Sent over HTTPS only in production.
- *  - sameSite: "none" in production — required because vouta-frontend.onrender.com and
- *    vouta-backend.onrender.com are cross-site (onrender.com is in the Public Suffix List,
- *    so each subdomain is its own eTLD+1). SameSite=Strict/Lax cookies are NEVER sent on
- *    cross-site requests, which would cause every authenticated call to return 401.
- *    SameSite=None + Secure allows cross-site cookies over HTTPS.
- *    CSRF is still mitigated by: the CORS origin allowlist, the httpOnly flag, and JWT validation.
- *  - sameSite: "lax" in development — localhost is same-site through the Vite proxy, and
- *    "none" requires Secure which doesn't work on plain HTTP localhost.
+ * Cookie flags. sameSite "none" in production because the frontend and backend live on
+ * different onrender.com subdomains (onrender.com is on the Public Suffix List, so they are
+ * cross-site). CSRF is mitigated by the CORS origin allowlist rejecting foreign origins before
+ * any route runs, and by the API accepting only JSON bodies.
  */
-function setAuthCookie(res, token) {
+function cookieOptions() {
   const isProd = process.env.NODE_ENV === "production";
-  res.cookie("vouta_token", token, {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? "none" : "lax",
-    maxAge: cookieMaxAgeMs(),
-    path: "/",
-  });
+  return { httpOnly: true, secure: isProd, sameSite: isProd ? "none" : "lax", path: "/" };
+}
+
+function setAuthCookie(res, token) {
+  res.cookie("vouta_token", token, { ...cookieOptions(), maxAge: cookieMaxAgeMs() });
 }
 
 function signToken(user) {
   return jwt.sign(
-    {
-      id: user.id,
-      email: user.email,
-      businessName: user.business_name,
-    },
+    { id: user.id, email: user.email },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
+    { algorithm: "HS256", expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
   );
 }
 
+// Same cost as real hashes so unknown emails take as long as wrong passwords.
+const DUMMY_HASH = bcrypt.hashSync("vouta-timing-equalizer", 12);
+
+/**
+ * The client-facing user: identity (email, displayName) is the signed-in person;
+ * business fields and role come from the workspace they are working in.
+ */
+async function buildUser(userId, ws) {
+  const { rows } = await pool.query(
+    "SELECT id, email, owner_name, business_name, business_type, created_at FROM users WHERE id = ANY($1::uuid[])",
+    [[userId, ws.effectiveUserId]]
+  );
+  const self = rows.find((r) => r.id === userId);
+  const owner = rows.find((r) => r.id === ws.effectiveUserId) || self;
+  if (!self) return null;
+  return {
+    id: self.id,
+    email: self.email,
+    displayName: self.owner_name,
+    ownerName: owner.owner_name,
+    businessName: owner.business_name,
+    businessType: owner.business_type,
+    role: ws.role,
+    isOwner: ws.effectiveUserId === self.id,
+    createdAt: self.created_at,
+  };
+}
+
 // ─── POST /api/auth/register ──────────────────────────────────────
-router.post("/register", authLimiter, validate(registerSchema), async (req, res) => {
+router.post("/register", authIpLimiter, validate(registerSchema), authAccountLimiter, async (req, res) => {
   const { email, password, ownerName, businessName, businessType } = req.body;
   try {
-    const existing = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ error: "An account with this email already exists." });
-    }
-
     const passwordHash = await bcrypt.hash(password, 12);
     const { rows } = await pool.query(
       `INSERT INTO users (email, password_hash, owner_name, business_name, business_type)
        VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, email, owner_name, business_name, business_type, created_at`,
+       RETURNING id, email`,
       [email, passwordHash, ownerName, businessName, businessType]
     );
 
@@ -122,25 +139,25 @@ router.post("/register", authLimiter, validate(registerSchema), async (req, res)
     // Set httpOnly cookie AND return token in JSON body for dual auth support
     setAuthCookie(res, token);
 
-    return res.status(201).json({ user: sanitizeUser(user, "admin"), token });
+    const ws = await resolveWorkspace(user.id);
+    return res.status(201).json({ user: await buildUser(user.id, ws), token });
   } catch (err) {
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "An account with this email already exists." });
+    }
     console.error("[Auth] Register error:", err.message);
     return res.status(500).json({ error: "Registration failed. Please try again." });
   }
 });
 
 // ─── POST /api/auth/login ─────────────────────────────────────────
-router.post("/login", authLimiter, validate(loginSchema), async (req, res) => {
+router.post("/login", authIpLimiter, validate(loginSchema), authAccountLimiter, async (req, res) => {
   const { email, password } = req.body;
   try {
-    const { rows } = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    const { rows } = await pool.query("SELECT id, email, password_hash FROM users WHERE email = $1", [email]);
     const user = rows[0];
 
-    const dummyHash = "$2a$12$invalidhashpadding00000000000000000000000000000000000000";
-    const valid = user
-      ? await bcrypt.compare(password, user.password_hash)
-      : await bcrypt.compare(password, dummyHash);
-
+    const valid = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
     if (!user || !valid) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
@@ -150,7 +167,8 @@ router.post("/login", authLimiter, validate(loginSchema), async (req, res) => {
     // Set httpOnly cookie AND return token in JSON body for dual auth support
     setAuthCookie(res, token);
 
-    return res.json({ user: sanitizeUser(user, "admin"), token });
+    const ws = await resolveWorkspace(user.id);
+    return res.json({ user: await buildUser(user.id, ws), token });
   } catch (err) {
     console.error("[Auth] Login error:", err.message);
     return res.status(500).json({ error: "Login failed. Please try again." });
@@ -158,28 +176,18 @@ router.post("/login", authLimiter, validate(loginSchema), async (req, res) => {
 });
 
 // ─── POST /api/auth/logout ────────────────────────────────────────
-// Clears the httpOnly auth cookie. JS on the page cannot clear it directly,
-// so this server-side endpoint is the only way to invalidate the session.
+// Clears the httpOnly auth cookie. JS on the page cannot clear it directly.
 router.post("/logout", (req, res) => {
-  const isProd = process.env.NODE_ENV === "production";
-  res.clearCookie("vouta_token", {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? "none" : "lax",  // Must match setAuthCookie flags exactly
-    path: "/",
-  });
+  res.clearCookie("vouta_token", cookieOptions());
   return res.json({ message: "Logged out successfully." });
 });
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────
 router.get("/me", authenticate, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      "SELECT id, email, owner_name, business_name, business_type, created_at FROM users WHERE id = $1",
-      [req.user.effectiveUserId || req.user.id]
-    );
-    if (!rows[0]) return res.status(404).json({ error: "User not found." });
-    return res.json({ user: sanitizeUser(rows[0], req.user.role) });
+    const user = await buildUser(req.user.id, req.user);
+    if (!user) return res.status(401).json({ error: "Account no longer exists." });
+    return res.json({ user });
   } catch (err) {
     console.error("[Auth] /me error:", err.message);
     return res.status(500).json({ error: "Failed to retrieve user." });
@@ -187,7 +195,8 @@ router.get("/me", authenticate, async (req, res) => {
 });
 
 // ─── PATCH /api/auth/profile ──────────────────────────────────────
-router.patch("/profile", authenticate, requireRole(["admin", "edit"]), validate(profileSchema), async (req, res) => {
+// Business profile of the current workspace (admin only — matches the Settings UI).
+router.patch("/profile", authenticate, requireRole(["admin"]), validate(profileSchema), async (req, res) => {
   const { ownerName, businessName, businessType } = req.body;
   const fields = [];
   const values = [];
@@ -201,29 +210,25 @@ router.patch("/profile", authenticate, requireRole(["admin", "edit"]), validate(
     return res.status(400).json({ error: "No fields provided to update." });
   }
 
-  values.push(req.user.effectiveUserId || req.user.id);
+  values.push(req.user.effectiveUserId);
   try {
-    const { rows } = await pool.query(
-      `UPDATE users SET ${fields.join(", ")} WHERE id = $${idx}
-       RETURNING id, email, owner_name, business_name, business_type, created_at`,
-      values
-    );
-    return res.json({ user: sanitizeUser(rows[0], req.user.role) });
+    await pool.query(`UPDATE users SET ${fields.join(", ")} WHERE id = $${idx}`, values);
+    return res.json({ user: await buildUser(req.user.id, req.user) });
   } catch (err) {
     console.error("[Auth] Profile update error:", err.message);
     return res.status(500).json({ error: "Failed to update profile." });
   }
 });
 
-// ─── Workspace Partner Access Endpoints ────────────────────────────
+// ─── Workspace Partner Access Endpoints (workspace admin side) ─────
 
 // GET /api/auth/members — List all partners invited to workspace
-router.get("/members", authenticate, async (req, res) => {
+router.get("/members", authenticate, requireRole(["admin"]), async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT wm.id, wm.email, wm.role, wm.status, wm.created_at, u.owner_name
        FROM workspace_members wm
-       LEFT JOIN users u ON LOWER(u.email) = LOWER(wm.email)
+       LEFT JOIN users u ON u.id = wm.user_id
        WHERE wm.owner_id = $1
        ORDER BY wm.created_at DESC`,
       [req.user.effectiveUserId]
@@ -235,22 +240,23 @@ router.get("/members", authenticate, async (req, res) => {
   }
 });
 
-// POST /api/auth/invite — Invite partner by email + assign role
+// POST /api/auth/invite — Invite partner by email + assign role. The invitee must accept.
 router.post("/invite", authenticate, requireRole(["admin"]), validate(inviteSchema), async (req, res) => {
   const { email, role } = req.body;
   const ownerId = req.user.effectiveUserId;
 
   try {
-    // Check if target user already exists
-    const userMatch = await pool.query("SELECT id FROM users WHERE LOWER(email) = LOWER($1)", [email]);
-    const targetUserId = userMatch.rows[0]?.id || null;
+    const owner = await pool.query("SELECT email FROM users WHERE id = $1", [ownerId]);
+    if (email === req.user.email.toLowerCase() || email === owner.rows[0]?.email.toLowerCase()) {
+      return res.status(400).json({ error: "You cannot invite yourself or the workspace owner." });
+    }
 
     const { rows } = await pool.query(
-      `INSERT INTO workspace_members (owner_id, user_id, email, role, status)
-       VALUES ($1, $2, $3, $4, 'accepted')
-       ON CONFLICT (owner_id, email) DO UPDATE SET role = EXCLUDED.role, status = 'accepted'
+      `INSERT INTO workspace_members (owner_id, email, role, status)
+       VALUES ($1, $2, $3, 'pending')
+       ON CONFLICT (owner_id, email) DO UPDATE SET role = EXCLUDED.role
        RETURNING id, email, role, status, created_at`,
-      [ownerId, targetUserId, email, role]
+      [ownerId, email, role]
     );
 
     return res.status(201).json(rows[0]);
@@ -293,16 +299,65 @@ router.delete("/members/:id", authenticate, requireRole(["admin"]), async (req, 
   }
 });
 
-function sanitizeUser(u, role = "admin") {
-  return {
-    id: u.id,
-    email: u.email,
-    ownerName: u.owner_name,
-    businessName: u.business_name,
-    businessType: u.business_type,
-    role: role || "admin",
-    createdAt: u.created_at,
-  };
-}
+// ─── Invitations (invitee side) ────────────────────────────────────
+// Rows addressed to the signed-in user: pending ones by email, accepted ones by user_id.
+const MINE = "(wm.user_id = $1 OR (wm.status = 'pending' AND LOWER(wm.email) = LOWER($2)))";
+
+// GET /api/auth/invitations — invitations for me, pending and accepted
+router.get("/invitations", authenticate, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT wm.id, wm.role, wm.status, wm.created_at, u.business_name, u.owner_name
+       FROM workspace_members wm JOIN users u ON u.id = wm.owner_id
+       WHERE ${MINE}
+       ORDER BY wm.created_at DESC`,
+      [req.user.id, req.user.email]
+    );
+    return res.json(rows.map((r) => ({
+      id: r.id,
+      role: r.role,
+      status: r.status,
+      businessName: r.business_name,
+      ownerName: r.owner_name,
+      createdAt: r.created_at,
+    })));
+  } catch (err) {
+    console.error("[Auth] GET invitations error:", err.message);
+    return res.status(500).json({ error: "Failed to fetch invitations." });
+  }
+});
+
+// POST /api/auth/invitations/:id/accept — join the inviting workspace
+router.post("/invitations/:id/accept", authenticate, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE workspace_members wm SET status = 'accepted', user_id = $1
+       WHERE wm.id = $3 AND wm.status = 'pending' AND ${MINE}`,
+      [req.user.id, req.user.email, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: "Invitation not found." });
+    const ws = await resolveWorkspace(req.user.id);
+    return res.json({ user: await buildUser(req.user.id, ws) });
+  } catch (err) {
+    console.error("[Auth] Accept invitation error:", err.message);
+    return res.status(500).json({ error: "Failed to accept invitation." });
+  }
+});
+
+// DELETE /api/auth/invitations/:id — decline a pending invite, or leave a workspace
+router.delete("/invitations/:id", authenticate, async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      `DELETE FROM workspace_members wm WHERE wm.id = $3 AND ${MINE}`,
+      [req.user.id, req.user.email, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: "Invitation not found." });
+    const ws = await resolveWorkspace(req.user.id);
+    return res.json({ user: await buildUser(req.user.id, ws) });
+  } catch (err) {
+    console.error("[Auth] Leave workspace error:", err.message);
+    return res.status(500).json({ error: "Failed to leave workspace." });
+  }
+});
 
 module.exports = router;
