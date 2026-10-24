@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -6,6 +7,7 @@ const { z } = require("zod");
 const { pool } = require("../config/db");
 const { validate, uuidParam } = require("../middleware/validate");
 const { authenticate, requireRole, resolveWorkspace } = require("../middleware/auth");
+const { sendMail } = require("../utils/mailer");
 
 // ─── Auth-specific rate limiters (login + register only) ──────────
 // Applied directly to the write routes so that GET /auth/me (which fires
@@ -26,6 +28,20 @@ const authAccountLimiter = rateLimit({
   max: 10,
   keyGenerator: (req) => `acct:${String(req.body?.email || "").toLowerCase().trim()}`,
 });
+
+// Forgot-password always answers 200, so successful requests must count too.
+// Per-email limit stops someone flooding a victim's inbox with reset emails.
+const resetIpLimiter = rateLimit({ ...limiterDefaults, skipSuccessfulRequests: false, max: 30 });
+const resetEmailLimiter = rateLimit({
+  ...limiterDefaults,
+  skipSuccessfulRequests: false,
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { error: "Too many reset requests for this email. Please try again in an hour." },
+  keyGenerator: (req) => `reset:${String(req.body?.email || "").toLowerCase().trim()}`,
+});
+
+const RESET_TTL_MINUTES = 30;
 
 const router = express.Router();
 router.param("id", uuidParam);
@@ -58,6 +74,17 @@ const inviteSchema = z.object({
 const roleSchema = z.object({
   role: z.enum(["view", "edit", "admin"]),
 });
+
+const forgotSchema = z.object({
+  email: z.string().trim().email("Invalid email address.").max(254).toLowerCase(),
+});
+
+const resetSchema = z.object({
+  token: z.string().regex(/^[0-9a-f]{64}$/, "This reset link is invalid."),
+  password: z.string().min(8, "Password must be at least 8 characters.").max(128, "Password is too long."),
+});
+
+const sha256 = (s) => crypto.createHash("sha256").update(s).digest("hex");
 
 // ─── Cookie config ─────────────────────────────────────────────────
 // JWT_EXPIRES_IN is e.g. "7d". Convert to milliseconds for cookie maxAge.
@@ -181,6 +208,91 @@ router.post("/logout", (req, res) => {
   res.clearCookie("vouta_token", cookieOptions());
   return res.json({ message: "Logged out successfully." });
 });
+
+// ─── POST /api/auth/forgot-password ───────────────────────────────
+// Always the same response, whether or not the email has an account, so it cannot
+// be used to discover who is registered. The email is sent in the background for
+// the same reason (response time must not depend on whether a user exists).
+router.post("/forgot-password", resetIpLimiter, validate(forgotSchema), resetEmailLimiter, async (req, res) => {
+  const { email } = req.body;
+  res.json({ message: "If an account exists for that email, a reset link is on its way." });
+
+  try {
+    const { rows } = await pool.query("SELECT id, owner_name FROM users WHERE email = $1", [email]);
+    const user = rows[0];
+    if (!user) return;
+
+    const token = crypto.randomBytes(32).toString("hex");
+    // A new link replaces any earlier unused ones.
+    await pool.query("DELETE FROM password_resets WHERE user_id = $1 AND used_at IS NULL", [user.id]);
+    await pool.query(
+      `INSERT INTO password_resets (user_id, token_hash, expires_at)
+       VALUES ($1, $2, NOW() + make_interval(mins => $3))`,
+      [user.id, sha256(token), RESET_TTL_MINUTES]
+    );
+
+    const appUrl = (process.env.APP_URL || "http://localhost:3000").replace(/\/+$/, "");
+    const link = `${appUrl}/reset-password?token=${token}`;
+    const name = user.owner_name || "there";
+    await sendMail({
+      to: email,
+      subject: "Reset your Vouta password",
+      text:
+        `Hi ${name},\n\nSomeone asked to reset the password for your Vouta account. ` +
+        `Open this link to choose a new one (it expires in ${RESET_TTL_MINUTES} minutes and works once):\n\n${link}\n\n` +
+        `If you didn't ask for this, ignore this email; your password stays the same.\n`,
+      html:
+        `<p>Hi ${escapeHtml(name)},</p>` +
+        `<p>Someone asked to reset the password for your Vouta account. ` +
+        `This link expires in ${RESET_TTL_MINUTES} minutes and works once:</p>` +
+        `<p><a href="${link}">Choose a new password</a></p>` +
+        `<p>If you didn't ask for this, ignore this email; your password stays the same.</p>`,
+    });
+  } catch (err) {
+    console.error("[Auth] Forgot-password error:", err.message);
+  }
+});
+
+// ─── POST /api/auth/reset-password ────────────────────────────────
+// Sets the new password, burns the token, and signs out every existing session.
+router.post("/reset-password", resetIpLimiter, validate(resetSchema), async (req, res) => {
+  const { token, password } = req.body;
+  const passwordHash = await bcrypt.hash(password, 12);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // FOR UPDATE: two simultaneous submits of the same link cannot both succeed.
+    const { rows } = await client.query(
+      `SELECT id, user_id FROM password_resets
+        WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+        FOR UPDATE`,
+      [sha256(token)]
+    );
+    if (!rows[0]) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "This reset link is invalid or has expired. Please request a new one." });
+    }
+    const { id, user_id } = rows[0];
+    await client.query(
+      "UPDATE users SET password_hash = $1, password_changed_at = NOW() WHERE id = $2",
+      [passwordHash, user_id]
+    );
+    await client.query("UPDATE password_resets SET used_at = NOW() WHERE id = $1", [id]);
+    await client.query("DELETE FROM password_resets WHERE user_id = $1 AND used_at IS NULL", [user_id]);
+    await client.query("COMMIT");
+    return res.json({ message: "Password updated. You can now sign in with your new password." });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    console.error("[Auth] Reset-password error:", err.message);
+    return res.status(500).json({ error: "Could not reset password. Please try again." });
+  } finally {
+    client.release();
+  }
+});
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────
 router.get("/me", authenticate, async (req, res) => {

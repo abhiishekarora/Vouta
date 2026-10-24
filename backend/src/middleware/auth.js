@@ -64,6 +64,16 @@ async function authenticate(req, res, next) {
   }
 
   try {
+    // Tokens issued before the last password change (e.g. a reset) are no longer valid,
+    // so resetting a stolen password also signs the thief out.
+    const { rows } = await pool.query("SELECT password_changed_at FROM users WHERE id = $1", [payload.id]);
+    if (!rows[0]) {
+      return res.status(401).json({ error: "Account no longer exists." });
+    }
+    const changedAt = rows[0].password_changed_at;
+    if (changedAt && Math.floor(changedAt.getTime() / 1000) > payload.iat) {
+      return res.status(401).json({ error: "Your password was changed. Please sign in again." });
+    }
     req.user = { ...payload, ...(await resolveWorkspace(payload.id)) };
   } catch (dbErr) {
     // Fail closed: never guess a role when the membership lookup is unavailable.
